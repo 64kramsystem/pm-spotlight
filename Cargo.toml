@@ -4,3 +4,4 @@ name = "pm-spotlight"
 version = "0.1.0"
 
 [dependencies]
+fltk = "^1.3"
