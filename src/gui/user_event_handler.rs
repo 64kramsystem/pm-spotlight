@@ -1,4 +1,4 @@
-use fltk::{app::set_focus, browser::HoldBrowser, prelude::*};
+use fltk::{app::set_focus, browser::HoldBrowser, input::Input, prelude::*};
 
 use super::user_event::UserEvent::{self, *};
 use crate::search::{searcher::Searcher, searchers_provider::SearchersProvider};
@@ -19,6 +19,7 @@ impl UserEventHandler {
         event: UserEvent,
         searchers_provider: &SearchersProvider,
         browser: &mut HoldBrowser,
+        input: &mut Input,
     ) {
         match event {
             UpdateList(pattern) => {
@@ -44,6 +45,11 @@ impl UserEventHandler {
                 if let Some(searcher) = &self.current_searcher {
                     searcher.execute(entry);
                 }
+            }
+            Reset => {
+                input.set_value("");
+                set_focus(input);
+                browser.clear();
             }
         }
     }
