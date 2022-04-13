@@ -40,8 +40,10 @@ impl UserEventHandler {
                     browser.select(1);
                 }
             }
-            SelectListEntry(text) => {
-                println!("selection: {}", text);
+            SelectListEntry(entry) => {
+                if let Some(searcher) = &self.current_searcher {
+                    searcher.execute(entry);
+                }
             }
         }
     }

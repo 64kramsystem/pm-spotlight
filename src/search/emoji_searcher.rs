@@ -154,4 +154,8 @@ impl Searcher for EmojiSearcher {
             vec![]
         }
     }
+
+    fn execute(&self, entry: String) {
+        println!("selection: {}", entry);
+    }
 }
