@@ -1,32 +1,36 @@
 use fltk::{app::set_focus, browser::HoldBrowser, prelude::*};
 
 use super::user_event::UserEvent::{self, *};
-use crate::search::searcher::Searcher;
+use crate::search::{searcher::Searcher, searchers_provider::SearchersProvider};
 
-pub struct UserEventHandler {}
+pub struct UserEventHandler {
+    current_searcher: Option<Box<dyn Searcher>>,
+}
 
 impl UserEventHandler {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            current_searcher: None,
+        }
     }
 
     pub fn handle_event(
-        &self,
+        &mut self,
         event: UserEvent,
-        searchers: &Vec<Box<dyn Searcher>>,
+        searchers_provider: &SearchersProvider,
         browser: &mut HoldBrowser,
     ) {
         match event {
             UpdateList(pattern) => {
                 browser.clear();
 
-                let search_result = searchers
-                    .iter()
-                    .find_map(|searcher| searcher.search(&pattern));
+                self.current_searcher = searchers_provider.find_provider(&pattern);
 
-                if let Some(entries_list) = search_result {
-                    for entry in &entries_list {
-                        browser.add(entry);
+                if let Some(searcher) = &self.current_searcher {
+                    let search_result = searcher.search(&pattern);
+
+                    for entry in search_result {
+                        browser.add(&entry);
                     }
                 }
             }
@@ -36,8 +40,10 @@ impl UserEventHandler {
                     browser.select(1);
                 }
             }
-            SelectListEntry(text) => {
-                println!("selection: {}", text);
+            SelectListEntry(entry) => {
+                if let Some(searcher) = &self.current_searcher {
+                    searcher.execute(entry);
+                }
             }
         }
     }
