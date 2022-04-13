@@ -1,3 +1,4 @@
+use copypasta::{ClipboardContext, ClipboardProvider};
 use phf::phf_map;
 
 use super::searcher::Searcher;
@@ -167,6 +168,8 @@ impl Searcher for EmojiSearcher {
             .iter()
             .collect::<String>();
 
-        println!("selection: {}", emoji);
+        let mut ctx = ClipboardContext::new().unwrap();
+        ctx.set_contents(emoji).unwrap();
+        println!("{:?}", ctx.get_contents());
     }
 }
