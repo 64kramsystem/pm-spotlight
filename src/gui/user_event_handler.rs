@@ -1,4 +1,4 @@
-use crate::user_event::UserEvent::{self, *};
+use super::user_event::UserEvent::{self, *};
 use fltk::{app::set_focus, browser::HoldBrowser, prelude::*};
 
 const ENTRIES_A: [&str; 3] = ["A:First", "A:Second", "A:Third"];

@@ -1,9 +1,11 @@
-mod app_builder;
-mod user_event;
-mod user_event_handler;
+mod gui {
+    pub mod app_builder;
+    pub mod user_event;
+    pub mod user_event_handler;
+}
 
-use app_builder::AppBuilder;
-use user_event_handler::UserEventHandler;
+use gui::app_builder::AppBuilder;
+use gui::user_event_handler::UserEventHandler;
 
 fn main() {
     let (app, mut browser, receiver) = AppBuilder::build();

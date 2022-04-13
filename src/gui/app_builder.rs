@@ -8,7 +8,7 @@ use fltk::{
     window::Window,
 };
 
-use crate::user_event::UserEvent::{self, *};
+use super::user_event::UserEvent::{self, *};
 
 const WINDOW_WIDTH: i32 = 300;
 const WINDOW_HEIGHT: i32 = 500;
