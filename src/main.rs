@@ -16,7 +16,7 @@ use search::searchers_provider::SearchersProvider;
 
 fn main() {
     let (app, mut browser, receiver) = AppBuilder::build();
-    let user_event_handler = UserEventHandler::new();
+    let mut user_event_handler = UserEventHandler::new();
     let searchers_provider = SearchersProvider::new();
 
     while app.wait() {
