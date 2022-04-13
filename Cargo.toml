@@ -4,6 +4,5 @@ name = "pm-spotlight"
 version = "0.1.0"
 
 [dependencies]
-copypasta = "0.7.1"
 fltk = "1.3.4"
 phf = {version = "0.10.1", features = ["macros"]}

@@ -10,6 +10,8 @@ use fltk::{
 
 use super::user_event::UserEvent::{self, *};
 
+const WINDOW_TITLE: &str = "Poor Man's Spotlight!";
+
 const WINDOW_WIDTH: i32 = 300;
 const WINDOW_HEIGHT: i32 = 500;
 
@@ -18,7 +20,9 @@ pub struct AppBuilder {}
 impl AppBuilder {
     pub fn build() -> (App, HoldBrowser, Receiver<UserEvent>) {
         let app = App::default();
-        let mut window = Window::default().with_size(WINDOW_WIDTH, WINDOW_HEIGHT);
+        let mut window = Window::default()
+            .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
+            .with_label(WINDOW_TITLE);
         let pack = Pack::default().size_of(&window);
 
         let (sender_i1, receiver) = app::channel();
