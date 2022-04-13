@@ -8,20 +8,15 @@ use fltk::{
     window::Window,
 };
 
-use UserEvent::*;
+mod user_event;
+
+use user_event::UserEvent::{self, *};
 
 const WINDOW_WIDTH: i32 = 300;
 const WINDOW_HEIGHT: i32 = 500;
 
 const ENTRIES_A: [&str; 3] = ["A:First", "A:Second", "A:Third"];
 const ENTRIES_B: [&str; 3] = ["B:First", "B:Second", "B:Third"];
-
-#[derive(Clone)]
-enum UserEvent {
-    UpdateList(String),
-    FocusOnList,
-    SelectListEntry(String),
-}
 
 fn main() {
     let app = App::default();
