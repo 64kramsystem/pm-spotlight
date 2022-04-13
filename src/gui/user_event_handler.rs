@@ -1,8 +1,7 @@
-use super::user_event::UserEvent::{self, *};
 use fltk::{app::set_focus, browser::HoldBrowser, prelude::*};
 
-const ENTRIES_A: [&str; 3] = ["A:First", "A:Second", "A:Third"];
-const ENTRIES_B: [&str; 3] = ["B:First", "B:Second", "B:Third"];
+use super::user_event::UserEvent::{self, *};
+use crate::search::searcher::Searcher;
 
 pub struct UserEventHandler {}
 
@@ -11,25 +10,23 @@ impl UserEventHandler {
         Self {}
     }
 
-    pub fn handle_event(&self, event: UserEvent, browser: &mut HoldBrowser) {
+    pub fn handle_event(
+        &self,
+        event: UserEvent,
+        searchers: &Vec<Box<dyn Searcher>>,
+        browser: &mut HoldBrowser,
+    ) {
         match event {
             UpdateList(pattern) => {
                 browser.clear();
 
-                match pattern.as_str() {
-                    "a" => {
-                        for entry in ENTRIES_A {
-                            browser.add(entry);
-                        }
-                    }
-                    "b" => {
-                        for entry in ENTRIES_B {
-                            browser.add(entry);
-                        }
-                    }
-                    _ => {
-                        let entry = format!("<none: {}>", pattern);
-                        browser.add(&entry);
+                let search_result = searchers
+                    .iter()
+                    .find_map(|searcher| searcher.search(&pattern));
+
+                if let Some(entries_list) = search_result {
+                    for entry in &entries_list {
+                        browser.add(entry);
                     }
                 }
             }
