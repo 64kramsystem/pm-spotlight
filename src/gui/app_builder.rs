@@ -55,24 +55,26 @@ impl AppBuilder {
         // It seems that Enter-initiated callback is not supported for browsers.
         //
         browser.handle(move |browser, _| {
-            // WATCH OUT! This event is global (not for the browser only).
-            //
-            // An alternative solution was to reset when tapping key up from the topmost Browser entry,
-            // but this is not feasible with fltk(-rs), because:
-            //
-            // - the event is fired after the selection is changed
-            // - the selection doesn't go above the first entry
-            //
-            if event_key_down(Key::Enter) {
-                if let Some(text) = browser.selected_text() {
-                    sender_b.send(SelectListEntry(text));
-                    sender_b.send(Reset);
-                } else if let Some(text) = browser.text(1) {
-                    sender_b.send(SelectListEntry(text));
-                    sender_b.send(Reset);
-                }
+            if let Some(focused) = focus() {
+                if focused.is_same(browser) {
+                    // An alternative solution was to reset when tapping key up from the topmost Browser entry,
+                    // but this is not feasible with fltk(-rs), because:
+                    //
+                    // - the event is fired after the selection is changed
+                    // - the selection doesn't go above the first entry
+                    //
+                    if event_key_down(Key::Enter) {
+                        if let Some(text) = browser.selected_text() {
+                            sender_b.send(SelectListEntry(text));
+                            sender_b.send(Reset);
+                        } else if let Some(text) = browser.text(1) {
+                            sender_b.send(SelectListEntry(text));
+                            sender_b.send(Reset);
+                        }
 
-                return true;
+                        return true;
+                    }
+                }
             }
 
             false
