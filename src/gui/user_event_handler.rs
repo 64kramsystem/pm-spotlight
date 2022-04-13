@@ -26,7 +26,7 @@ impl UserEventHandler {
 
                 self.current_searcher = searchers_provider.find_provider(&pattern);
 
-                if let Some(searcher) = &self.current_searcher {
+                if let Some(searcher) = &mut self.current_searcher {
                     let search_result = searcher.search(&pattern);
 
                     for entry in search_result {
