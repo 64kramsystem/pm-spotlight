@@ -155,7 +155,7 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(":")
     }
 
-    fn search(&self, pattern: &str) -> Vec<String> {
+    fn search(&mut self, pattern: &str) -> Vec<String> {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if pattern.len() > 0 {
