@@ -20,28 +20,24 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(":")
     }
 
-    fn search(&self, pattern: &str) -> Option<Vec<String>> {
-        if pattern.starts_with(":") {
-            let pattern = pattern.chars().skip(1).collect::<String>();
+    fn search(&self, pattern: &str) -> Vec<String> {
+        let pattern = pattern.chars().skip(1).collect::<String>();
 
-            if pattern.len() > 0 {
-                let matching_emojis = EMOJI_PATTERNS
-                    .into_iter()
-                    .filter_map(|(patterns, emoji)| {
-                        if patterns.contains(&pattern) {
-                            Some(emoji.to_string())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+        if pattern.len() > 0 {
+            let matching_emojis = EMOJI_PATTERNS
+                .into_iter()
+                .filter_map(|(patterns, emoji)| {
+                    if patterns.contains(&pattern) {
+                        Some(emoji.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
 
-                Some(matching_emojis)
-            } else {
-                None
-            }
+            matching_emojis
         } else {
-            None
+            vec![]
         }
     }
 }
