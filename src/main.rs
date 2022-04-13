@@ -15,13 +15,13 @@ use gui::user_event_handler::UserEventHandler;
 use search::searchers_provider::SearchersProvider;
 
 fn main() {
-    let (app, mut browser, receiver) = AppBuilder::build();
+    let (app, mut browser, mut input, receiver) = AppBuilder::build();
     let mut user_event_handler = UserEventHandler::new();
     let searchers_provider = SearchersProvider::new();
 
     while app.wait() {
         if let Some(event) = receiver.recv() {
-            user_event_handler.handle_event(event, &searchers_provider, &mut browser);
+            user_event_handler.handle_event(event, &searchers_provider, &mut browser, &mut input);
         }
     }
 }
