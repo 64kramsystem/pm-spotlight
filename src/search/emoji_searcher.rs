@@ -142,7 +142,7 @@ impl Searcher for EmojiSearcher {
                 .into_iter()
                 .filter_map(|(patterns, emoji)| {
                     if patterns.contains(&pattern) {
-                        Some(emoji.to_string())
+                        Some(format!("{} ({})", patterns, emoji))
                     } else {
                         None
                     }
@@ -156,6 +156,17 @@ impl Searcher for EmojiSearcher {
     }
 
     fn execute(&self, entry: String) {
-        println!("selection: {}", entry);
+        let entry_chars = entry.chars().collect::<Vec<char>>();
+
+        // An Emoji may be multiple chars, so we can't just assume that it's only char -2.
+        //
+        let parentheses_start = entry_chars.iter().position(|c| *c == '(').unwrap();
+        let parentheses_end = entry_chars.len() - 1;
+
+        let emoji = entry_chars[(parentheses_start + 1)..parentheses_end]
+            .iter()
+            .collect::<String>();
+
+        println!("selection: {}", emoji);
     }
 }
