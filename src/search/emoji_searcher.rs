@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -124,11 +125,15 @@ const EMOJI_PATTERNS: phf::Map<&str, &str> = phf_map! {
     "zombie"                                                  => "🧟",
 };
 
-pub struct EmojiSearcher {}
+pub struct EmojiSearcher {
+    data: HashMap<String, String>,
+}
 
 impl EmojiSearcher {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            data: HashMap::new(),
+        }
     }
 
     fn copy_to_clipboard(text: String) {
@@ -155,39 +160,36 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(":")
     }
 
-    fn search(&self, pattern: &str) -> Vec<String> {
+    fn search(&mut self, pattern: &str) -> Vec<String> {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if pattern.len() > 0 {
-            let matching_emojis = EMOJI_PATTERNS
+            let matching_emojis_data = EMOJI_PATTERNS
                 .into_iter()
                 .filter_map(|(patterns, emoji)| {
                     if patterns.contains(&pattern) {
-                        Some(format!("{} ({})", patterns, emoji))
+                        Some((patterns.to_string(), emoji.to_string()))
                     } else {
                         None
                     }
                 })
-                .collect();
+                .collect::<Vec<_>>();
 
-            matching_emojis
+            for (patterns, emoji) in &matching_emojis_data {
+                self.data.insert(patterns.to_string(), emoji.to_string());
+            }
+
+            matching_emojis_data
+                .into_iter()
+                .map(|(patterns, _)| patterns)
+                .collect()
         } else {
             vec![]
         }
     }
 
     fn execute(&self, entry: String) {
-        let entry_chars = entry.chars().collect::<Vec<char>>();
-
-        // An Emoji may be multiple chars, so we can't just assume that it's only char -2.
-        //
-        let parentheses_start = entry_chars.iter().position(|c| *c == '(').unwrap();
-        let parentheses_end = entry_chars.len() - 1;
-
-        let emoji = entry_chars[(parentheses_start + 1)..parentheses_end]
-            .iter()
-            .collect::<String>();
-
-        Self::copy_to_clipboard(emoji);
+        let emoji = self.data.get(&entry).unwrap();
+        Self::copy_to_clipboard(emoji.to_string());
     }
 }
