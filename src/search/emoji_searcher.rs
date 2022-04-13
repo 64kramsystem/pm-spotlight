@@ -16,6 +16,10 @@ impl EmojiSearcher {
 }
 
 impl Searcher for EmojiSearcher {
+    fn handles(&self, pattern: &str) -> bool {
+        pattern.starts_with(":")
+    }
+
     fn search(&self, pattern: &str) -> Option<Vec<String>> {
         if pattern.starts_with(":") {
             let pattern = pattern.chars().skip(1).collect::<String>();
