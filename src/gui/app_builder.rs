@@ -18,7 +18,7 @@ const WINDOW_HEIGHT: i32 = 500;
 pub struct AppBuilder {}
 
 impl AppBuilder {
-    pub fn build() -> (App, HoldBrowser, Receiver<UserEvent>) {
+    pub fn build() -> (App, HoldBrowser, Input, Receiver<UserEvent>) {
         let app = App::default();
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -74,6 +74,6 @@ impl AppBuilder {
         window.end();
         window.show();
 
-        (app, browser, receiver)
+        (app, browser, input, receiver)
     }
 }
