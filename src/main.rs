@@ -1,7 +1,6 @@
 mod gui {
     pub mod pm_spotlight_app;
     pub mod user_event;
-    pub mod user_event_handler;
 }
 
 mod search {
@@ -15,12 +14,9 @@ mod helpers {
 }
 
 use gui::pm_spotlight_app::PMSpotlightApp;
-use gui::user_event_handler::UserEventHandler;
 use search::searchers_provider::SearchersProvider;
 
 fn main() {
-    let user_event_handler = UserEventHandler::new();
     let searchers_provider = SearchersProvider::new();
-
-    PMSpotlightApp::build(user_event_handler, searchers_provider).run();
+    PMSpotlightApp::build(searchers_provider).run();
 }

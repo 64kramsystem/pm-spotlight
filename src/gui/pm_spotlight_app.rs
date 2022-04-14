@@ -5,17 +5,15 @@ use fltk::{
     browser::HoldBrowser,
     enums::{CallbackTrigger, Key},
     group::Pack,
+    image::PngImage,
     input::Input,
     prelude::*,
     window::Window,
 };
 
-use crate::search::searchers_provider::SearchersProvider;
+use crate::search::{searcher::Searcher, searchers_provider::SearchersProvider};
 
-use super::{
-    user_event::UserEvent::{self, *},
-    user_event_handler::UserEventHandler,
-};
+use super::user_event::UserEvent::{self, *};
 
 type Rcc<T> = Rc<RefCell<T>>;
 
@@ -27,18 +25,15 @@ const WINDOW_HEIGHT: i32 = 500;
 const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 
 pub struct PMSpotlightApp {
-    user_event_handler: UserEventHandler,
     searchers_provider: SearchersProvider,
+    current_searcher: Option<Box<dyn Searcher>>,
     app: App,
     receiver: Receiver<UserEvent>,
     browser: Rcc<HoldBrowser>,
 }
 
 impl PMSpotlightApp {
-    pub fn build(
-        user_event_handler: UserEventHandler,
-        searchers_provider: SearchersProvider,
-    ) -> Self {
+    pub fn build(searchers_provider: SearchersProvider) -> Self {
         let app = App::default();
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -62,8 +57,8 @@ impl PMSpotlightApp {
         window.show();
 
         Self {
-            user_event_handler,
             searchers_provider,
+            current_searcher: None,
             app,
             receiver,
             browser,
@@ -73,11 +68,14 @@ impl PMSpotlightApp {
     pub fn run(&mut self) {
         while self.app.wait() {
             if let Some(event) = self.receiver.recv() {
-                self.user_event_handler.handle_event(
-                    event,
-                    &self.searchers_provider,
-                    &mut self.browser,
-                );
+                match event {
+                    UpdateList(pattern) => {
+                        self.event_update_list(pattern);
+                    }
+                    SelectListEntry(entry) => {
+                        self.event_execute_entry(entry);
+                    }
+                }
             }
         }
     }
@@ -157,6 +155,38 @@ impl PMSpotlightApp {
 
             false
         });
+    }
+
+    fn event_update_list(&mut self, pattern: String) {
+        self.browser.borrow_mut().clear();
+
+        self.current_searcher = self.searchers_provider.find_provider(&pattern);
+
+        if let Some(searcher) = &mut self.current_searcher {
+            let search_result = searcher.search(&pattern);
+            self.set_list_entries(search_result);
+        }
+    }
+
+    fn event_execute_entry(&self, entry: String) {
+        if let Some(searcher) = &self.current_searcher {
+            searcher.execute(entry);
+        }
+    }
+
+    fn set_list_entries(&mut self, entries: Vec<(Option<PngImage>, String, Option<String>)>) {
+        let mut browser = self.browser.borrow_mut();
+
+        for (icon, entry_text, entry_data) in entries {
+            if let Some(entry_data) = entry_data {
+                browser.add_with_data(&entry_text, entry_data);
+            } else {
+                browser.add(&entry_text);
+            }
+
+            let browser_size = browser.size();
+            browser.set_icon(browser_size, icon);
+        }
     }
 
     fn reset_interface(browser: &mut HoldBrowser, input: &Rcc<Input>) {
