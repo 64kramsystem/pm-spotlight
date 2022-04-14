@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use fltk::{
     app::{self, event_key_down, focus, set_focus, App, Receiver, Sender},
     browser::HoldBrowser,
@@ -15,8 +13,6 @@ use crate::search::{searcher::Searcher, searchers_provider::SearchersProvider};
 
 use super::message_event::MessageEvent::{self, *};
 
-type Rcc<T> = Rc<RefCell<T>>;
-
 const WINDOW_TITLE: &str = "Poor Man's Spotlight!";
 
 const WINDOW_WIDTH: i32 = 350;
@@ -29,7 +25,7 @@ pub struct PMSpotlightApp {
     current_searcher: Option<Box<dyn Searcher>>,
     app: App,
     receiver: Receiver<MessageEvent>,
-    browser: Rcc<HoldBrowser>,
+    browser: HoldBrowser,
     input: Input,
 }
 
@@ -44,14 +40,14 @@ impl PMSpotlightApp {
         let (sender, receiver) = app::channel();
 
         let mut input = Input::default().with_size(0, 25);
-        let browser = Rc::new(RefCell::new(HoldBrowser::default_fill()));
+        let mut browser = HoldBrowser::default_fill();
 
-        browser.borrow_mut().set_text_size(BROWSER_TEXT_SIZE);
+        browser.set_text_size(BROWSER_TEXT_SIZE);
         input.set_trigger(CallbackTrigger::Changed);
 
         Self::callback_update_list(&mut input, &sender);
-        Self::fltk_event_move_from_input_to_list(&browser, &mut input);
-        Self::fltk_event_select_list_entry(&browser, &sender);
+        Self::fltk_event_move_from_input_to_list(&mut input, &sender);
+        Self::fltk_event_select_list_entry(&mut browser, &sender);
 
         pack.end();
         window.end();
@@ -74,6 +70,10 @@ impl PMSpotlightApp {
                     UpdateList(pattern) => {
                         self.message_event_update_list(pattern);
                     }
+                    FocusOnList => {
+                        self.message_event_focus_on_list();
+                    }
+
                     ExecuteListEntry(entry) => {
                         self.message_event_execute_entry(entry);
                     }
@@ -98,21 +98,15 @@ impl PMSpotlightApp {
      * FLTK event handlers
      ***************************************************************************/
 
-    fn fltk_event_move_from_input_to_list(browser: &Rcc<HoldBrowser>, input: &mut Input) {
-        let browser = browser.clone();
+    fn fltk_event_move_from_input_to_list(input: &mut Input, sender: &Sender<MessageEvent>) {
+        let sender = sender.clone();
 
         input.handle(move |input, _| {
             if event_key_down(Key::Down) {
                 if let Some(focused) = focus() {
                     if focused.is_same(input) {
-                        let mut browser = browser.borrow_mut();
-
-                        if browser.size() > 0 {
-                            set_focus(&*browser);
-                            browser.select(1);
-
-                            return true;
-                        }
+                        sender.send(FocusOnList);
+                        return true;
                     }
                 }
             }
@@ -121,12 +115,12 @@ impl PMSpotlightApp {
         });
     }
 
-    fn fltk_event_select_list_entry(browser: &Rcc<HoldBrowser>, sender: &Sender<MessageEvent>) {
+    fn fltk_event_select_list_entry(browser: &mut HoldBrowser, sender: &Sender<MessageEvent>) {
         let sender = sender.clone();
 
         // It seems that Enter-initiated callback is not supported for browsers.
         //
-        browser.borrow_mut().handle(move |browser, _| {
+        browser.handle(move |browser, _| {
             if let Some(focused) = focus() {
                 if focused.is_same(browser) {
                     // An alternative solution was to reset when tapping key up from the topmost Browser entry,
@@ -164,7 +158,7 @@ impl PMSpotlightApp {
      ***************************************************************************/
 
     fn message_event_update_list(&mut self, pattern: String) {
-        self.browser.borrow_mut().clear();
+        self.browser.clear();
 
         self.current_searcher = self.searchers_provider.find_provider(&pattern);
 
@@ -174,13 +168,20 @@ impl PMSpotlightApp {
         }
     }
 
+    fn message_event_focus_on_list(&mut self) {
+        if self.browser.size() > 0 {
+            set_focus(&self.browser);
+            self.browser.select(1);
+        }
+    }
+
     fn message_event_execute_entry(&mut self, entry: String) {
         if let Some(searcher) = &self.current_searcher {
             searcher.execute(entry);
 
             self.input.set_value("");
             set_focus(&self.input);
-            self.browser.borrow_mut().clear();
+            self.browser.clear();
         }
     }
 
@@ -189,17 +190,14 @@ impl PMSpotlightApp {
      ***************************************************************************/
 
     fn set_list_entries(&mut self, entries: Vec<(Option<PngImage>, String, Option<String>)>) {
-        let mut browser = self.browser.borrow_mut();
-
         for (icon, entry_text, entry_data) in entries {
             if let Some(entry_data) = entry_data {
-                browser.add_with_data(&entry_text, entry_data);
+                self.browser.add_with_data(&entry_text, entry_data);
             } else {
-                browser.add(&entry_text);
+                self.browser.add(&entry_text);
             }
 
-            let browser_size = browser.size();
-            browser.set_icon(browser_size, icon);
+            self.browser.set_icon(self.browser.size(), icon);
         }
     }
 }
