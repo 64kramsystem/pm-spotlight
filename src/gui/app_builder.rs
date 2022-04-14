@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use fltk::{
-    app::{self, event_key_down, focus, set_focus, App, Receiver},
+    app::{self, event_key_down, focus, set_focus, App, Receiver, Sender},
     browser::HoldBrowser,
     enums::{CallbackTrigger, Key},
     group::Pack,
@@ -22,7 +22,12 @@ const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 pub struct AppBuilder {}
 
 impl AppBuilder {
-    pub fn build() -> (App, Rc<RefCell<HoldBrowser>>, Input, Receiver<UserEvent>) {
+    pub fn build() -> (
+        App,
+        Rc<RefCell<HoldBrowser>>,
+        Rc<RefCell<Input>>,
+        Receiver<UserEvent>,
+    ) {
         let app = App::default();
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -32,15 +37,13 @@ impl AppBuilder {
         let (sender_i, receiver) = app::channel();
         let sender_b = sender_i.clone();
 
-        let mut input = Input::default().with_size(0, 25);
+        let input = Rc::new(RefCell::new(Input::default().with_size(0, 25)));
         let browser = Rc::new(RefCell::new(HoldBrowser::default_fill()));
 
-        input.set_trigger(CallbackTrigger::Changed);
-        input.set_callback(move |input| {
-            sender_i.send(UpdateList(input.value()));
-        });
+        input.borrow_mut().set_trigger(CallbackTrigger::Changed);
+        Self::callback_update_list(&input, &sender_i);
 
-        Self::callback_move_from_input_to_list(&browser, &mut input);
+        Self::callback_move_from_input_to_list(&browser, &input);
 
         browser.borrow_mut().set_text_size(BROWSER_TEXT_SIZE);
 
@@ -87,10 +90,22 @@ impl AppBuilder {
         (app, browser, input, receiver)
     }
 
-    fn callback_move_from_input_to_list(browser: &Rc<RefCell<HoldBrowser>>, input: &mut Input) {
+    fn callback_update_list(input: &Rc<RefCell<Input>>, sender: &Sender<UserEvent>) {
+        let input = input.clone();
+        let sender = sender.clone();
+
+        input.borrow_mut().set_callback(move |input| {
+            sender.send(UpdateList(input.value()));
+        });
+    }
+
+    fn callback_move_from_input_to_list(
+        browser: &Rc<RefCell<HoldBrowser>>,
+        input: &Rc<RefCell<Input>>,
+    ) {
         let browser = browser.clone();
 
-        input.handle(move |input, _| {
+        input.borrow_mut().handle(move |input, _| {
             if event_key_down(Key::Down) {
                 if let Some(focused) = focus() {
                     if focused.is_same(input) {

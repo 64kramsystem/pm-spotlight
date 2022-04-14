@@ -21,9 +21,10 @@ impl UserEventHandler {
         event: UserEvent,
         searchers_provider: &SearchersProvider,
         browser: &Rc<RefCell<HoldBrowser>>,
-        input: &mut Input,
+        input: &Rc<RefCell<Input>>,
     ) {
         let mut browser = browser.borrow_mut();
+        let mut input = input.borrow_mut();
 
         match event {
             UpdateList(pattern) => {
@@ -53,7 +54,7 @@ impl UserEventHandler {
             }
             Reset => {
                 input.set_value("");
-                set_focus(input);
+                set_focus(&*input);
                 browser.clear();
             }
         }
