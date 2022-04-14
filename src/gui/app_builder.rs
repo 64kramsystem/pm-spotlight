@@ -59,7 +59,7 @@ impl AppBuilder {
 
         while app.wait() {
             if let Some(event) = receiver.recv() {
-                user_event_handler.handle_event(event, &searchers_provider, browser.clone());
+                user_event_handler.handle_event(event, &searchers_provider, &browser);
             }
         }
     }
