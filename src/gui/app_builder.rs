@@ -64,10 +64,18 @@ impl AppBuilder {
                     // - the selection doesn't go above the first entry
                     //
                     if event_key_down(Key::Enter) {
-                        if let Some(text) = browser.selected_text() {
+                        let selected_line = if browser.value() > 0 {
+                            browser.value()
+                        } else if browser.size() >= 0 {
+                            1
+                        } else {
+                            return true;
+                        };
+
+                        if let Some::<String>(text) = unsafe { browser.data(selected_line) } {
                             sender_b.send(SelectListEntry(text));
                             sender_b.send(Reset);
-                        } else if let Some(text) = browser.text(1) {
+                        } else if let Some(text) = browser.text(selected_line) {
                             sender_b.send(SelectListEntry(text));
                             sender_b.send(Reset);
                         }

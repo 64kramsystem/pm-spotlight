@@ -160,7 +160,7 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(":")
     }
 
-    fn search(&mut self, pattern: &str) -> Vec<String> {
+    fn search(&mut self, pattern: &str) -> Vec<(String, Option<String>)> {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if pattern.len() > 0 {
@@ -181,15 +181,14 @@ impl Searcher for EmojiSearcher {
 
             matching_emojis_data
                 .into_iter()
-                .map(|(patterns, _)| patterns)
+                .map(|(patterns, emoji)| (patterns, Some(emoji)))
                 .collect()
         } else {
             vec![]
         }
     }
 
-    fn execute(&self, entry: String) {
-        let emoji = self.data.get(&entry).unwrap();
-        Self::copy_to_clipboard(emoji.to_string());
+    fn execute(&self, emoji: String) {
+        Self::copy_to_clipboard(emoji);
     }
 }
