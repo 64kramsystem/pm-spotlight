@@ -176,6 +176,10 @@ impl PMSpotlightApp {
     }
 
     fn message_event_execute_entry(&mut self, entry: String) {
+        // In line of theory (but probably impossible) in order for self.current_searcher to be None,
+        // the user should have typed something without a corresponding searcher between executing an
+        // entry, and the execution message being processed.
+        //
         if let Some(searcher) = &self.current_searcher {
             searcher.execute(entry);
 
