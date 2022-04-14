@@ -1,5 +1,7 @@
+use std::{cell::RefCell, rc::Rc};
+
 use fltk::{
-    app::{self, event_key_down, focus, App, Receiver},
+    app::{self, event_key_down, focus, set_focus, App, Receiver},
     browser::HoldBrowser,
     enums::{CallbackTrigger, Key},
     group::Pack,
@@ -20,44 +22,31 @@ const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 pub struct AppBuilder {}
 
 impl AppBuilder {
-    pub fn build() -> (App, HoldBrowser, Input, Receiver<UserEvent>) {
+    pub fn build() -> (App, Rc<RefCell<HoldBrowser>>, Input, Receiver<UserEvent>) {
         let app = App::default();
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
             .with_label(WINDOW_TITLE);
         let pack = Pack::default().size_of(&window);
 
-        let (sender_i1, receiver) = app::channel();
-        let sender_i2 = sender_i1.clone();
-        let sender_b = sender_i1.clone();
+        let (sender_i, receiver) = app::channel();
+        let sender_b = sender_i.clone();
 
         let mut input = Input::default().with_size(0, 25);
+        let browser = Rc::new(RefCell::new(HoldBrowser::default_fill()));
 
         input.set_trigger(CallbackTrigger::Changed);
         input.set_callback(move |input| {
-            sender_i1.send(UpdateList(input.value()));
+            sender_i.send(UpdateList(input.value()));
         });
 
-        input.handle(move |input, _| {
-            if event_key_down(Key::Down) {
-                if let Some(focused) = focus() {
-                    if focused.is_same(input) {
-                        sender_i2.send(FocusOnList);
+        Self::callback_move_from_input_to_list(&browser, &mut input);
 
-                        return true;
-                    }
-                }
-            }
-
-            false
-        });
-
-        let mut browser = HoldBrowser::default_fill();
-        browser.set_text_size(BROWSER_TEXT_SIZE);
+        browser.borrow_mut().set_text_size(BROWSER_TEXT_SIZE);
 
         // It seems that Enter-initiated callback is not supported for browsers.
         //
-        browser.handle(move |browser, _| {
+        browser.borrow_mut().handle(move |browser, _| {
             if let Some(focused) = focus() {
                 if focused.is_same(browser) {
                     // An alternative solution was to reset when tapping key up from the topmost Browser entry,
@@ -96,5 +85,28 @@ impl AppBuilder {
         window.show();
 
         (app, browser, input, receiver)
+    }
+
+    fn callback_move_from_input_to_list(browser: &Rc<RefCell<HoldBrowser>>, input: &mut Input) {
+        let browser = browser.clone();
+
+        input.handle(move |input, _| {
+            if event_key_down(Key::Down) {
+                if let Some(focused) = focus() {
+                    if focused.is_same(input) {
+                        let mut browser = browser.borrow_mut();
+
+                        if browser.size() > 0 {
+                            set_focus(&*browser);
+                            browser.select(1);
+
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            false
+        });
     }
 }

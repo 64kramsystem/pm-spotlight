@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use fltk::{app::set_focus, browser::HoldBrowser, input::Input, prelude::*};
 
 use super::user_event::UserEvent::{self, *};
@@ -18,9 +20,11 @@ impl UserEventHandler {
         &mut self,
         event: UserEvent,
         searchers_provider: &SearchersProvider,
-        browser: &mut HoldBrowser,
+        browser: &Rc<RefCell<HoldBrowser>>,
         input: &mut Input,
     ) {
+        let mut browser = browser.borrow_mut();
+
         match event {
             UpdateList(pattern) => {
                 browser.clear();
@@ -37,14 +41,9 @@ impl UserEventHandler {
                             browser.add(&entry_text);
                         }
 
-                        browser.set_icon(browser.size(), icon);
+                        let browser_size = browser.size();
+                        browser.set_icon(browser_size, icon);
                     }
-                }
-            }
-            FocusOnList => {
-                if browser.size() > 0 {
-                    set_focus(browser);
-                    browser.select(1);
                 }
             }
             SelectListEntry(entry) => {
