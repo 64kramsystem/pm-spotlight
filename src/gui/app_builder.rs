@@ -44,13 +44,11 @@ impl AppBuilder {
         let input = Rc::new(RefCell::new(Input::default().with_size(0, 25)));
         let browser = Rc::new(RefCell::new(HoldBrowser::default_fill()));
 
-        input.borrow_mut().set_trigger(CallbackTrigger::Changed);
-        Self::callback_update_list(&input, &sender);
-
-        Self::callback_move_from_input_to_list(&browser, &input);
-
         browser.borrow_mut().set_text_size(BROWSER_TEXT_SIZE);
+        input.borrow_mut().set_trigger(CallbackTrigger::Changed);
 
+        Self::callback_update_list(&input, &sender);
+        Self::callback_move_from_input_to_list(&browser, &input);
         Self::callback_select_list_entry(&browser, &input, &sender);
 
         pack.end();
