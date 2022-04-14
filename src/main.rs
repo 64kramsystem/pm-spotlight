@@ -1,5 +1,5 @@
 mod gui {
-    pub mod app_builder;
+    pub mod pm_spotlight_app;
     pub mod user_event;
     pub mod user_event_handler;
 }
@@ -14,7 +14,7 @@ mod helpers {
     pub mod clipboard_management;
 }
 
-use gui::app_builder::AppBuilder;
+use gui::pm_spotlight_app::PMSpotlightApp;
 use gui::user_event_handler::UserEventHandler;
 use search::searchers_provider::SearchersProvider;
 
@@ -22,5 +22,5 @@ fn main() {
     let user_event_handler = UserEventHandler::new();
     let searchers_provider = SearchersProvider::new();
 
-    AppBuilder::build_and_run(user_event_handler, searchers_provider);
+    PMSpotlightApp::build(user_event_handler, searchers_provider).run();
 }

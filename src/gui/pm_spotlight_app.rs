@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use fltk::{
-    app::{self, event_key_down, focus, set_focus, App, Sender},
+    app::{self, event_key_down, focus, set_focus, App, Receiver, Sender},
     browser::HoldBrowser,
     enums::{CallbackTrigger, Key},
     group::Pack,
@@ -26,13 +26,19 @@ const WINDOW_HEIGHT: i32 = 500;
 
 const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 
-pub struct AppBuilder {}
+pub struct PMSpotlightApp {
+    user_event_handler: UserEventHandler,
+    searchers_provider: SearchersProvider,
+    app: App,
+    receiver: Receiver<UserEvent>,
+    browser: Rcc<HoldBrowser>,
+}
 
-impl AppBuilder {
-    pub fn build_and_run(
-        mut user_event_handler: UserEventHandler,
+impl PMSpotlightApp {
+    pub fn build(
+        user_event_handler: UserEventHandler,
         searchers_provider: SearchersProvider,
-    ) {
+    ) -> Self {
         let app = App::default();
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -55,9 +61,23 @@ impl AppBuilder {
         window.end();
         window.show();
 
-        while app.wait() {
-            if let Some(event) = receiver.recv() {
-                user_event_handler.handle_event(event, &searchers_provider, &browser);
+        Self {
+            user_event_handler,
+            searchers_provider,
+            app,
+            receiver,
+            browser,
+        }
+    }
+
+    pub fn run(&mut self) {
+        while self.app.wait() {
+            if let Some(event) = self.receiver.recv() {
+                self.user_event_handler.handle_event(
+                    event,
+                    &self.searchers_provider,
+                    &mut self.browser,
+                );
             }
         }
     }
