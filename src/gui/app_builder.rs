@@ -34,54 +34,19 @@ impl AppBuilder {
             .with_label(WINDOW_TITLE);
         let pack = Pack::default().size_of(&window);
 
-        let (sender_i, receiver) = app::channel();
-        let sender_b = sender_i.clone();
+        let (sender, receiver) = app::channel();
 
         let input = Rc::new(RefCell::new(Input::default().with_size(0, 25)));
         let browser = Rc::new(RefCell::new(HoldBrowser::default_fill()));
 
         input.borrow_mut().set_trigger(CallbackTrigger::Changed);
-        Self::callback_update_list(&input, &sender_i);
+        Self::callback_update_list(&input, &sender);
 
         Self::callback_move_from_input_to_list(&browser, &input);
 
         browser.borrow_mut().set_text_size(BROWSER_TEXT_SIZE);
 
-        // It seems that Enter-initiated callback is not supported for browsers.
-        //
-        browser.borrow_mut().handle(move |browser, _| {
-            if let Some(focused) = focus() {
-                if focused.is_same(browser) {
-                    // An alternative solution was to reset when tapping key up from the topmost Browser entry,
-                    // but this is not feasible with fltk(-rs), because:
-                    //
-                    // - the event is fired after the selection is changed
-                    // - the selection doesn't go above the first entry
-                    //
-                    if event_key_down(Key::Enter) {
-                        let selected_line = if browser.value() > 0 {
-                            browser.value()
-                        } else if browser.size() >= 0 {
-                            1
-                        } else {
-                            return true;
-                        };
-
-                        if let Some::<String>(text) = unsafe { browser.data(selected_line) } {
-                            sender_b.send(SelectListEntry(text));
-                            sender_b.send(Reset);
-                        } else if let Some(text) = browser.text(selected_line) {
-                            sender_b.send(SelectListEntry(text));
-                            sender_b.send(Reset);
-                        }
-
-                        return true;
-                    }
-                }
-            }
-
-            false
-        });
+        Self::callback_select_list_entry(&browser, &sender);
 
         pack.end();
         window.end();
@@ -117,6 +82,46 @@ impl AppBuilder {
 
                             return true;
                         }
+                    }
+                }
+            }
+
+            false
+        });
+    }
+
+    fn callback_select_list_entry(browser: &Rc<RefCell<HoldBrowser>>, sender: &Sender<UserEvent>) {
+        let sender = sender.clone();
+
+        // It seems that Enter-initiated callback is not supported for browsers.
+        //
+        browser.borrow_mut().handle(move |browser, _| {
+            if let Some(focused) = focus() {
+                if focused.is_same(browser) {
+                    // An alternative solution was to reset when tapping key up from the topmost Browser entry,
+                    // but this is not feasible with fltk(-rs), because:
+                    //
+                    // - the event is fired after the selection is changed
+                    // - the selection doesn't go above the first entry
+                    //
+                    if event_key_down(Key::Enter) {
+                        let selected_line = if browser.value() > 0 {
+                            browser.value()
+                        } else if browser.size() >= 0 {
+                            1
+                        } else {
+                            return true;
+                        };
+
+                        if let Some::<String>(text) = unsafe { browser.data(selected_line) } {
+                            sender.send(SelectListEntry(text));
+                            sender.send(Reset);
+                        } else if let Some(text) = browser.text(selected_line) {
+                            sender.send(SelectListEntry(text));
+                            sender.send(Reset);
+                        }
+
+                        return true;
                     }
                 }
             }
