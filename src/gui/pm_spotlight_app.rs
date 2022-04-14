@@ -13,7 +13,7 @@ use fltk::{
 
 use crate::search::{searcher::Searcher, searchers_provider::SearchersProvider};
 
-use super::user_event::UserEvent::{self, *};
+use super::message_event::MessageEvent::{self, *};
 
 type Rcc<T> = Rc<RefCell<T>>;
 
@@ -28,7 +28,7 @@ pub struct PMSpotlightApp {
     searchers_provider: SearchersProvider,
     current_searcher: Option<Box<dyn Searcher>>,
     app: App,
-    receiver: Receiver<UserEvent>,
+    receiver: Receiver<MessageEvent>,
     browser: Rcc<HoldBrowser>,
 }
 
@@ -49,8 +49,8 @@ impl PMSpotlightApp {
         input.borrow_mut().set_trigger(CallbackTrigger::Changed);
 
         Self::callback_update_list(&input, &sender);
-        Self::callback_move_from_input_to_list(&browser, &input);
-        Self::callback_select_list_entry(&browser, &input, &sender);
+        Self::fltk_event_move_from_input_to_list(&browser, &input);
+        Self::fltk_event_select_list_entry(&browser, &input, &sender);
 
         pack.end();
         window.end();
@@ -70,17 +70,21 @@ impl PMSpotlightApp {
             if let Some(event) = self.receiver.recv() {
                 match event {
                     UpdateList(pattern) => {
-                        self.event_update_list(pattern);
+                        self.message_event_update_list(pattern);
                     }
                     SelectListEntry(entry) => {
-                        self.event_execute_entry(entry);
+                        self.message_event_execute_entry(entry);
                     }
                 }
             }
         }
     }
 
-    fn callback_update_list(input: &Rcc<Input>, sender: &Sender<UserEvent>) {
+    /***************************************************************************
+     * Callbacks
+     ***************************************************************************/
+
+    fn callback_update_list(input: &Rcc<Input>, sender: &Sender<MessageEvent>) {
         let input = input.clone();
         let sender = sender.clone();
 
@@ -89,7 +93,11 @@ impl PMSpotlightApp {
         });
     }
 
-    fn callback_move_from_input_to_list(browser: &Rcc<HoldBrowser>, input: &Rcc<Input>) {
+    /***************************************************************************
+     * FLTK event handlers
+     ***************************************************************************/
+
+    fn fltk_event_move_from_input_to_list(browser: &Rcc<HoldBrowser>, input: &Rcc<Input>) {
         let browser = browser.clone();
 
         input.borrow_mut().handle(move |input, _| {
@@ -112,10 +120,10 @@ impl PMSpotlightApp {
         });
     }
 
-    fn callback_select_list_entry(
+    fn fltk_event_select_list_entry(
         browser: &Rcc<HoldBrowser>,
         input: &Rcc<Input>,
-        sender: &Sender<UserEvent>,
+        sender: &Sender<MessageEvent>,
     ) {
         let sender = sender.clone();
         let input = input.clone();
@@ -157,7 +165,11 @@ impl PMSpotlightApp {
         });
     }
 
-    fn event_update_list(&mut self, pattern: String) {
+    /***************************************************************************
+     * MessageEvent handlers
+     ***************************************************************************/
+
+    fn message_event_update_list(&mut self, pattern: String) {
         self.browser.borrow_mut().clear();
 
         self.current_searcher = self.searchers_provider.find_provider(&pattern);
@@ -168,11 +180,15 @@ impl PMSpotlightApp {
         }
     }
 
-    fn event_execute_entry(&self, entry: String) {
+    fn message_event_execute_entry(&self, entry: String) {
         if let Some(searcher) = &self.current_searcher {
             searcher.execute(entry);
         }
     }
+
+    /***************************************************************************
+     * Helpers
+     ***************************************************************************/
 
     fn set_list_entries(&mut self, entries: Vec<(Option<PngImage>, String, Option<String>)>) {
         let mut browser = self.browser.borrow_mut();

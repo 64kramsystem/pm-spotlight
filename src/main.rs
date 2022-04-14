@@ -1,6 +1,6 @@
 mod gui {
+    pub mod message_event;
     pub mod pm_spotlight_app;
-    pub mod user_event;
 }
 
 mod search {
