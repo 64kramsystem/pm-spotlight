@@ -4,5 +4,5 @@ name = "pm-spotlight"
 version = "0.1.0"
 
 [dependencies]
-fltk = "1.3.4"
+fltk = {git = "https://github.com/fltk-rs/fltk-rs", rev = "8a28c59903a2b7e6a22d776e53bed758f9dc5e49"}# v1.3.4, with Browser data support
 phf = {version = "0.10.1", features = ["macros"]}

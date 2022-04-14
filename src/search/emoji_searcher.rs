@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -125,15 +124,11 @@ const EMOJI_PATTERNS: phf::Map<&str, &str> = phf_map! {
     "zombie"                                                  => "🧟",
 };
 
-pub struct EmojiSearcher {
-    data: HashMap<String, String>,
-}
+pub struct EmojiSearcher {}
 
 impl EmojiSearcher {
     pub fn new() -> Self {
-        Self {
-            data: HashMap::new(),
-        }
+        Self {}
     }
 
     fn copy_to_clipboard(text: String) {
@@ -160,7 +155,7 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(":")
     }
 
-    fn search(&mut self, pattern: &str) -> Vec<String> {
+    fn search(&mut self, pattern: &str) -> Vec<(String, Option<String>)> {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if pattern.len() > 0 {
@@ -175,21 +170,16 @@ impl Searcher for EmojiSearcher {
                 })
                 .collect::<Vec<_>>();
 
-            for (patterns, emoji) in &matching_emojis_data {
-                self.data.insert(patterns.to_string(), emoji.to_string());
-            }
-
             matching_emojis_data
                 .into_iter()
-                .map(|(patterns, _)| patterns)
+                .map(|(patterns, emoji)| (patterns, Some(emoji)))
                 .collect()
         } else {
             vec![]
         }
     }
 
-    fn execute(&self, entry: String) {
-        let emoji = self.data.get(&entry).unwrap();
-        Self::copy_to_clipboard(emoji.to_string());
+    fn execute(&self, emoji: String) {
+        Self::copy_to_clipboard(emoji);
     }
 }
