@@ -1,9 +1,7 @@
-use std::io::Write;
-use std::process::{Command, Stdio};
-
 use phf::phf_map;
 
 use super::searcher::Searcher;
+use crate::helpers::clipboard_management::copy_to_clipboard;
 
 const EMOJI_PATTERNS: phf::Map<&str, &str> = phf_map! {
     "+1, thumbs up"                                           => "👍",
@@ -130,24 +128,6 @@ impl EmojiSearcher {
     pub fn new() -> Self {
         Self {}
     }
-
-    fn copy_to_clipboard(text: String) {
-        // Copypasta was unstable; sometimes it didn't copy to clipboard, sometimes it has strange side
-        // effects, like not pasting on the first paste invocation, or the paste being displayed in the
-        // destination program only after other chars were typed.
-        //
-        let mut child = Command::new("xsel")
-            .arg("-ib")
-            .stdin(Stdio::piped())
-            .spawn()
-            .unwrap();
-        let mut child_stdin = child.stdin.take().unwrap();
-
-        write!(child_stdin, "{}", text).unwrap();
-
-        drop(child_stdin);
-        child.wait().unwrap();
-    }
 }
 
 impl Searcher for EmojiSearcher {
@@ -180,6 +160,6 @@ impl Searcher for EmojiSearcher {
     }
 
     fn execute(&self, emoji: String) {
-        Self::copy_to_clipboard(emoji);
+        copy_to_clipboard(emoji);
     }
 }
