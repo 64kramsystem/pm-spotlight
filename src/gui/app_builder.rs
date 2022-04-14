@@ -12,6 +12,8 @@ use fltk::{
 
 use super::user_event::UserEvent::{self, *};
 
+type Rcc<T> = Rc<RefCell<T>>;
+
 const WINDOW_TITLE: &str = "Poor Man's Spotlight!";
 
 const WINDOW_WIDTH: i32 = 350;
@@ -22,12 +24,7 @@ const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 pub struct AppBuilder {}
 
 impl AppBuilder {
-    pub fn build() -> (
-        App,
-        Rc<RefCell<HoldBrowser>>,
-        Rc<RefCell<Input>>,
-        Receiver<UserEvent>,
-    ) {
+    pub fn build() -> (App, Rcc<HoldBrowser>, Rcc<Input>, Receiver<UserEvent>) {
         let app = App::default();
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -55,7 +52,7 @@ impl AppBuilder {
         (app, browser, input, receiver)
     }
 
-    fn callback_update_list(input: &Rc<RefCell<Input>>, sender: &Sender<UserEvent>) {
+    fn callback_update_list(input: &Rcc<Input>, sender: &Sender<UserEvent>) {
         let input = input.clone();
         let sender = sender.clone();
 
@@ -64,10 +61,7 @@ impl AppBuilder {
         });
     }
 
-    fn callback_move_from_input_to_list(
-        browser: &Rc<RefCell<HoldBrowser>>,
-        input: &Rc<RefCell<Input>>,
-    ) {
+    fn callback_move_from_input_to_list(browser: &Rcc<HoldBrowser>, input: &Rcc<Input>) {
         let browser = browser.clone();
 
         input.borrow_mut().handle(move |input, _| {
@@ -90,7 +84,7 @@ impl AppBuilder {
         });
     }
 
-    fn callback_select_list_entry(browser: &Rc<RefCell<HoldBrowser>>, sender: &Sender<UserEvent>) {
+    fn callback_select_list_entry(browser: &Rcc<HoldBrowser>, sender: &Sender<UserEvent>) {
         let sender = sender.clone();
 
         // It seems that Enter-initiated callback is not supported for browsers.
