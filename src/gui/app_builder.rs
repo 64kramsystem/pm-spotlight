@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use fltk::{
-    app::{self, event_key_down, focus, set_focus, App, Receiver, Sender},
+    app::{self, event_key_down, focus, set_focus, App, Sender},
     browser::HoldBrowser,
     enums::{CallbackTrigger, Key},
     group::Pack,
@@ -10,7 +10,12 @@ use fltk::{
     window::Window,
 };
 
-use super::user_event::UserEvent::{self, *};
+use crate::search::searchers_provider::SearchersProvider;
+
+use super::{
+    user_event::UserEvent::{self, *},
+    user_event_handler::UserEventHandler,
+};
 
 type Rcc<T> = Rc<RefCell<T>>;
 
@@ -24,7 +29,10 @@ const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 pub struct AppBuilder {}
 
 impl AppBuilder {
-    pub fn build() -> (App, Rcc<HoldBrowser>, Receiver<UserEvent>) {
+    pub fn build_and_run(
+        mut user_event_handler: UserEventHandler,
+        searchers_provider: SearchersProvider,
+    ) {
         let app = App::default();
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -49,7 +57,11 @@ impl AppBuilder {
         window.end();
         window.show();
 
-        (app, browser, receiver)
+        while app.wait() {
+            if let Some(event) = receiver.recv() {
+                user_event_handler.handle_event(event, &searchers_provider, browser.clone());
+            }
+        }
     }
 
     fn callback_update_list(input: &Rcc<Input>, sender: &Sender<UserEvent>) {

@@ -22,10 +22,10 @@ impl UserEventHandler {
         searchers_provider: &SearchersProvider,
         browser: &Rc<RefCell<HoldBrowser>>,
     ) {
-        let mut browser = browser.borrow_mut();
-
         match event {
             UpdateList(pattern) => {
+                let mut browser = browser.borrow_mut();
+
                 browser.clear();
 
                 self.current_searcher = searchers_provider.find_provider(&pattern);
