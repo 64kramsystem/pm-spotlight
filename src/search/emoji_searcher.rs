@@ -140,20 +140,15 @@ impl Searcher for EmojiSearcher {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if pattern.len() > 0 {
-            let matching_emojis_data = EMOJI_PATTERNS
+            EMOJI_PATTERNS
                 .into_iter()
                 .filter_map(|(patterns, emoji)| {
                     if patterns.contains(&pattern) {
-                        Some((patterns.to_string(), emoji.to_string()))
+                        Some((None, patterns.to_string(), Some(emoji.to_string())))
                     } else {
                         None
                     }
                 })
-                .collect::<Vec<_>>();
-
-            matching_emojis_data
-                .into_iter()
-                .map(|(patterns, emoji)| (None, patterns, Some(emoji)))
                 .collect()
         } else {
             vec![]
