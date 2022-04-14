@@ -10,6 +10,10 @@ mod search {
     pub mod searchers_provider;
 }
 
+mod helpers {
+    pub mod clipboard_management;
+}
+
 use gui::app_builder::AppBuilder;
 use gui::user_event_handler::UserEventHandler;
 use search::searchers_provider::SearchersProvider;

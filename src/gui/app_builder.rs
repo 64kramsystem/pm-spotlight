@@ -12,8 +12,10 @@ use super::user_event::UserEvent::{self, *};
 
 const WINDOW_TITLE: &str = "Poor Man's Spotlight!";
 
-const WINDOW_WIDTH: i32 = 300;
+const WINDOW_WIDTH: i32 = 350;
 const WINDOW_HEIGHT: i32 = 500;
+
+const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 
 pub struct AppBuilder {}
 
@@ -51,6 +53,7 @@ impl AppBuilder {
         });
 
         let mut browser = HoldBrowser::default_fill();
+        browser.set_text_size(BROWSER_TEXT_SIZE);
 
         // It seems that Enter-initiated callback is not supported for browsers.
         //
