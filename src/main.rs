@@ -1,7 +1,6 @@
 mod gui {
-    pub mod app_builder;
-    pub mod user_event;
-    pub mod user_event_handler;
+    pub mod message_event;
+    pub mod pm_spotlight_app;
 }
 
 mod search {
@@ -14,18 +13,10 @@ mod helpers {
     pub mod clipboard_management;
 }
 
-use gui::app_builder::AppBuilder;
-use gui::user_event_handler::UserEventHandler;
+use gui::pm_spotlight_app::PMSpotlightApp;
 use search::searchers_provider::SearchersProvider;
 
 fn main() {
-    let (app, mut browser, mut input, receiver) = AppBuilder::build();
-    let mut user_event_handler = UserEventHandler::new();
     let searchers_provider = SearchersProvider::new();
-
-    while app.wait() {
-        if let Some(event) = receiver.recv() {
-            user_event_handler.handle_event(event, &searchers_provider, &mut browser, &mut input);
-        }
-    }
+    PMSpotlightApp::build(searchers_provider).run();
 }
