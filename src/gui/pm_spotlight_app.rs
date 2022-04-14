@@ -30,6 +30,7 @@ pub struct PMSpotlightApp {
     app: App,
     receiver: Receiver<MessageEvent>,
     browser: Rcc<HoldBrowser>,
+    input: Input,
 }
 
 impl PMSpotlightApp {
@@ -42,15 +43,15 @@ impl PMSpotlightApp {
 
         let (sender, receiver) = app::channel();
 
-        let input = Rc::new(RefCell::new(Input::default().with_size(0, 25)));
+        let mut input = Input::default().with_size(0, 25);
         let browser = Rc::new(RefCell::new(HoldBrowser::default_fill()));
 
         browser.borrow_mut().set_text_size(BROWSER_TEXT_SIZE);
-        input.borrow_mut().set_trigger(CallbackTrigger::Changed);
+        input.set_trigger(CallbackTrigger::Changed);
 
-        Self::callback_update_list(&input, &sender);
-        Self::fltk_event_move_from_input_to_list(&browser, &input);
-        Self::fltk_event_select_list_entry(&browser, &input, &sender);
+        Self::callback_update_list(&mut input, &sender);
+        Self::fltk_event_move_from_input_to_list(&browser, &mut input);
+        Self::fltk_event_select_list_entry(&browser, &sender);
 
         pack.end();
         window.end();
@@ -62,6 +63,7 @@ impl PMSpotlightApp {
             app,
             receiver,
             browser,
+            input,
         }
     }
 
@@ -84,11 +86,10 @@ impl PMSpotlightApp {
      * Callbacks
      ***************************************************************************/
 
-    fn callback_update_list(input: &Rcc<Input>, sender: &Sender<MessageEvent>) {
-        let input = input.clone();
+    fn callback_update_list(input: &mut Input, sender: &Sender<MessageEvent>) {
         let sender = sender.clone();
 
-        input.borrow_mut().set_callback(move |input| {
+        input.set_callback(move |input| {
             sender.send(UpdateList(input.value()));
         });
     }
@@ -97,10 +98,10 @@ impl PMSpotlightApp {
      * FLTK event handlers
      ***************************************************************************/
 
-    fn fltk_event_move_from_input_to_list(browser: &Rcc<HoldBrowser>, input: &Rcc<Input>) {
+    fn fltk_event_move_from_input_to_list(browser: &Rcc<HoldBrowser>, input: &mut Input) {
         let browser = browser.clone();
 
-        input.borrow_mut().handle(move |input, _| {
+        input.handle(move |input, _| {
             if event_key_down(Key::Down) {
                 if let Some(focused) = focus() {
                     if focused.is_same(input) {
@@ -120,13 +121,8 @@ impl PMSpotlightApp {
         });
     }
 
-    fn fltk_event_select_list_entry(
-        browser: &Rcc<HoldBrowser>,
-        input: &Rcc<Input>,
-        sender: &Sender<MessageEvent>,
-    ) {
+    fn fltk_event_select_list_entry(browser: &Rcc<HoldBrowser>, sender: &Sender<MessageEvent>) {
         let sender = sender.clone();
-        let input = input.clone();
 
         // It seems that Enter-initiated callback is not supported for browsers.
         //
@@ -150,10 +146,8 @@ impl PMSpotlightApp {
 
                         if let Some::<String>(text) = unsafe { browser.data(selected_line) } {
                             sender.send(SelectListEntry(text));
-                            Self::reset_interface(browser, &input);
                         } else if let Some(text) = browser.text(selected_line) {
                             sender.send(SelectListEntry(text));
-                            Self::reset_interface(browser, &input);
                         }
 
                         return true;
@@ -180,9 +174,13 @@ impl PMSpotlightApp {
         }
     }
 
-    fn message_event_execute_entry(&self, entry: String) {
+    fn message_event_execute_entry(&mut self, entry: String) {
         if let Some(searcher) = &self.current_searcher {
             searcher.execute(entry);
+
+            self.input.set_value("");
+            set_focus(&self.input);
+            self.browser.borrow_mut().clear();
         }
     }
 
@@ -203,13 +201,5 @@ impl PMSpotlightApp {
             let browser_size = browser.size();
             browser.set_icon(browser_size, icon);
         }
-    }
-
-    fn reset_interface(browser: &mut HoldBrowser, input: &Rcc<Input>) {
-        let mut input = input.borrow_mut();
-
-        input.set_value("");
-        set_focus(&*input);
-        browser.clear();
     }
 }
