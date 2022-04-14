@@ -1,3 +1,4 @@
+use fltk::image::PngImage;
 use phf::phf_map;
 
 use super::searcher::Searcher;
@@ -135,7 +136,7 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(":")
     }
 
-    fn search(&mut self, pattern: &str) -> Vec<(String, Option<String>)> {
+    fn search(&mut self, pattern: &str) -> Vec<(Option<PngImage>, String, Option<String>)> {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if pattern.len() > 0 {
@@ -152,7 +153,7 @@ impl Searcher for EmojiSearcher {
 
             matching_emojis_data
                 .into_iter()
-                .map(|(patterns, emoji)| (patterns, Some(emoji)))
+                .map(|(patterns, emoji)| (None, patterns, Some(emoji)))
                 .collect()
         } else {
             vec![]

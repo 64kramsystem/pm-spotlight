@@ -30,12 +30,14 @@ impl UserEventHandler {
                 if let Some(searcher) = &mut self.current_searcher {
                     let search_result = searcher.search(&pattern);
 
-                    for (entry_text, entry_data) in search_result {
+                    for (icon, entry_text, entry_data) in search_result {
                         if let Some(entry_data) = entry_data {
                             browser.add_with_data(&entry_text, entry_data);
                         } else {
                             browser.add(&entry_text);
                         }
+
+                        browser.set_icon(browser.size(), icon);
                     }
                 }
             }
