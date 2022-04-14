@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use fltk::{app::set_focus, browser::HoldBrowser, input::Input, prelude::*};
+use fltk::{browser::HoldBrowser, prelude::*};
 
 use super::user_event::UserEvent::{self, *};
 use crate::search::{searcher::Searcher, searchers_provider::SearchersProvider};
@@ -21,10 +21,8 @@ impl UserEventHandler {
         event: UserEvent,
         searchers_provider: &SearchersProvider,
         browser: &Rc<RefCell<HoldBrowser>>,
-        input: &Rc<RefCell<Input>>,
     ) {
         let mut browser = browser.borrow_mut();
-        let mut input = input.borrow_mut();
 
         match event {
             UpdateList(pattern) => {
@@ -51,11 +49,6 @@ impl UserEventHandler {
                 if let Some(searcher) = &self.current_searcher {
                     searcher.execute(entry);
                 }
-            }
-            Reset => {
-                input.set_value("");
-                set_focus(&*input);
-                browser.clear();
             }
         }
     }

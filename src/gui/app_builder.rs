@@ -24,7 +24,7 @@ const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 pub struct AppBuilder {}
 
 impl AppBuilder {
-    pub fn build() -> (App, Rcc<HoldBrowser>, Rcc<Input>, Receiver<UserEvent>) {
+    pub fn build() -> (App, Rcc<HoldBrowser>, Receiver<UserEvent>) {
         let app = App::default();
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -43,13 +43,13 @@ impl AppBuilder {
 
         browser.borrow_mut().set_text_size(BROWSER_TEXT_SIZE);
 
-        Self::callback_select_list_entry(&browser, &sender);
+        Self::callback_select_list_entry(&browser, &input, &sender);
 
         pack.end();
         window.end();
         window.show();
 
-        (app, browser, input, receiver)
+        (app, browser, receiver)
     }
 
     fn callback_update_list(input: &Rcc<Input>, sender: &Sender<UserEvent>) {
@@ -84,8 +84,13 @@ impl AppBuilder {
         });
     }
 
-    fn callback_select_list_entry(browser: &Rcc<HoldBrowser>, sender: &Sender<UserEvent>) {
+    fn callback_select_list_entry(
+        browser: &Rcc<HoldBrowser>,
+        input: &Rcc<Input>,
+        sender: &Sender<UserEvent>,
+    ) {
         let sender = sender.clone();
+        let input = input.clone();
 
         // It seems that Enter-initiated callback is not supported for browsers.
         //
@@ -109,10 +114,10 @@ impl AppBuilder {
 
                         if let Some::<String>(text) = unsafe { browser.data(selected_line) } {
                             sender.send(SelectListEntry(text));
-                            sender.send(Reset);
+                            Self::reset_interface(browser, &input);
                         } else if let Some(text) = browser.text(selected_line) {
                             sender.send(SelectListEntry(text));
-                            sender.send(Reset);
+                            Self::reset_interface(browser, &input);
                         }
 
                         return true;
@@ -122,5 +127,13 @@ impl AppBuilder {
 
             false
         });
+    }
+
+    fn reset_interface(browser: &mut HoldBrowser, input: &Rcc<Input>) {
+        let mut input = input.borrow_mut();
+
+        input.set_value("");
+        set_focus(&*input);
+        browser.clear();
     }
 }
