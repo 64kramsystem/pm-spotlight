@@ -74,7 +74,7 @@ impl PMSpotlightApp {
                     UpdateList(pattern) => {
                         self.message_event_update_list(pattern);
                     }
-                    SelectListEntry(entry) => {
+                    ExecuteListEntry(entry) => {
                         self.message_event_execute_entry(entry);
                     }
                 }
@@ -145,9 +145,9 @@ impl PMSpotlightApp {
                         };
 
                         if let Some::<String>(text) = unsafe { browser.data(selected_line) } {
-                            sender.send(SelectListEntry(text));
+                            sender.send(ExecuteListEntry(text));
                         } else if let Some(text) = browser.text(selected_line) {
-                            sender.send(SelectListEntry(text));
+                            sender.send(ExecuteListEntry(text));
                         }
 
                         return true;
