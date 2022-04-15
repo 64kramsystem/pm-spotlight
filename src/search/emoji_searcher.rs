@@ -1,4 +1,4 @@
-use fltk::image::PngImage;
+use fltk::image::{PngImage, SharedImage};
 use phf::phf_map;
 
 use super::searcher::Searcher;
@@ -135,7 +135,7 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(":")
     }
 
-    fn search(&mut self, pattern: &str) -> Vec<(Option<PngImage>, String, Option<String>)> {
+    fn search(&mut self, pattern: &str) -> Vec<(Option<SharedImage>, String, Option<String>)> {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if pattern.len() > 0 {
@@ -143,8 +143,10 @@ impl Searcher for EmojiSearcher {
                 .into_iter()
                 .filter_map(|(emoji, (patterns, image_bytes))| {
                     if patterns.contains(&pattern) {
+                        let shared_image =
+                            SharedImage::from_image(PngImage::from_data(image_bytes).unwrap());
                         Some((
-                            PngImage::from_data(image_bytes).ok(),
+                            shared_image.ok(),
                             patterns.to_string(),
                             Some(emoji.to_string()),
                         ))
