@@ -4,5 +4,6 @@ name = "pm-spotlight"
 version = "0.1.0"
 
 [dependencies]
-fltk = {git = "https://github.com/fltk-rs/fltk-rs", rev = "8a28c59903a2b7e6a22d776e53bed758f9dc5e49"}# v1.3.4, with Browser data support
+# Unreleased fltk-rs (v1.3.5) includes Browser data support, and fixes SharedImage::from_image
+fltk = {git = "https://github.com/fltk-rs/fltk-rs", rev = "a0402da3d160f55a5d41b1a8daec3d7a41f58fbc"}
 phf = {version = "0.10.1", features = ["macros"]}
