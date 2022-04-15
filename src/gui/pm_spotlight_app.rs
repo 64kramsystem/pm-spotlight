@@ -3,7 +3,7 @@ use fltk::{
     browser::HoldBrowser,
     enums::{CallbackTrigger, Key},
     group::Pack,
-    image::PngImage,
+    image::SharedImage,
     input::Input,
     prelude::*,
     window::Window,
@@ -193,7 +193,7 @@ impl PMSpotlightApp {
      * Helpers
      ***************************************************************************/
 
-    fn set_list_entries(&mut self, entries: Vec<(Option<PngImage>, String, Option<String>)>) {
+    fn set_list_entries(&mut self, entries: Vec<(Option<SharedImage>, String, Option<String>)>) {
         for (icon, entry_text, entry_data) in entries {
             if let Some(entry_data) = entry_data {
                 self.browser.add_with_data(&entry_text, entry_data);
