@@ -1,7 +1,7 @@
 use fltk::{
-    app::{self, event_key_down, focus, set_focus, App, Receiver, Sender},
+    app::{self, set_focus, App, Receiver, Sender},
     browser::HoldBrowser,
-    enums::{CallbackTrigger, Key},
+    enums::{CallbackTrigger, Event, Key},
     group::Pack,
     image::SharedImage,
     input::Input,
@@ -97,14 +97,10 @@ impl PMSpotlightApp {
      ***************************************************************************/
 
     fn fltk_event_move_from_input_to_list(input: &mut Input, sender: Sender<MessageEvent>) {
-        input.handle(move |input, _| {
-            if event_key_down(Key::Down) {
-                if let Some(focused) = focus() {
-                    if focused.is_same(input) {
-                        sender.send(FocusOnList);
-                        return true;
-                    }
-                }
+        input.handle(move |_input, event| {
+            if event == Event::KeyDown && app::event_key() == Key::Down {
+                sender.send(FocusOnList);
+                return true;
             }
 
             false
@@ -114,33 +110,29 @@ impl PMSpotlightApp {
     fn fltk_event_select_list_entry(browser: &mut HoldBrowser, sender: Sender<MessageEvent>) {
         // It seems that Enter-initiated callback is not supported for browsers.
         //
-        browser.handle(move |browser, _| {
+        browser.handle(move |browser, event| {
             // An alternative solution was to reset when tapping key up from the topmost Browser entry,
             // but this is not feasible with fltk(-rs), because:
             //
             // - the event is fired after the selection is changed
             // - the selection doesn't go above the first entry
             //
-            if event_key_down(Key::Enter) {
-                if let Some(focused) = focus() {
-                    if focused.is_same(browser) {
-                        let selected_line = if browser.value() > 0 {
-                            browser.value()
-                        } else if browser.size() >= 0 {
-                            1
-                        } else {
-                            return true;
-                        };
+            if event == Event::KeyDown && app::event_key() == Key::Enter {
+                let selected_line = if browser.value() > 0 {
+                    browser.value()
+                } else if browser.size() >= 0 {
+                    1
+                } else {
+                    return true;
+                };
 
-                        if let Some::<String>(text) = unsafe { browser.data(selected_line) } {
-                            sender.send(ExecuteListEntry(text));
-                        } else if let Some(text) = browser.text(selected_line) {
-                            sender.send(ExecuteListEntry(text));
-                        }
-
-                        return true;
-                    }
+                if let Some::<String>(text) = unsafe { browser.data(selected_line) } {
+                    sender.send(ExecuteListEntry(text));
+                } else if let Some(text) = browser.text(selected_line) {
+                    sender.send(ExecuteListEntry(text));
                 }
+
+                return true;
             }
 
             false
