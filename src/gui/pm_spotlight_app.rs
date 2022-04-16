@@ -45,9 +45,9 @@ impl PMSpotlightApp {
         browser.set_text_size(BROWSER_TEXT_SIZE);
         input.set_trigger(CallbackTrigger::Changed);
 
-        Self::callback_update_list(&mut input, &sender);
-        Self::fltk_event_move_from_input_to_list(&mut input, &sender);
-        Self::fltk_event_select_list_entry(&mut browser, &sender);
+        Self::callback_update_list(&mut input, sender.clone());
+        Self::fltk_event_move_from_input_to_list(&mut input, sender.clone());
+        Self::fltk_event_select_list_entry(&mut browser, sender.clone());
 
         pack.end();
         window.end();
@@ -86,9 +86,7 @@ impl PMSpotlightApp {
      * Callbacks
      ***************************************************************************/
 
-    fn callback_update_list(input: &mut Input, sender: &Sender<MessageEvent>) {
-        let sender = sender.clone();
-
+    fn callback_update_list(input: &mut Input, sender: Sender<MessageEvent>) {
         input.set_callback(move |input| {
             sender.send(UpdateList(input.value()));
         });
@@ -98,9 +96,7 @@ impl PMSpotlightApp {
      * FLTK event handlers
      ***************************************************************************/
 
-    fn fltk_event_move_from_input_to_list(input: &mut Input, sender: &Sender<MessageEvent>) {
-        let sender = sender.clone();
-
+    fn fltk_event_move_from_input_to_list(input: &mut Input, sender: Sender<MessageEvent>) {
         input.handle(move |input, _| {
             if event_key_down(Key::Down) {
                 if let Some(focused) = focus() {
@@ -115,9 +111,7 @@ impl PMSpotlightApp {
         });
     }
 
-    fn fltk_event_select_list_entry(browser: &mut HoldBrowser, sender: &Sender<MessageEvent>) {
-        let sender = sender.clone();
-
+    fn fltk_event_select_list_entry(browser: &mut HoldBrowser, sender: Sender<MessageEvent>) {
         // It seems that Enter-initiated callback is not supported for browsers.
         //
         browser.handle(move |browser, _| {
