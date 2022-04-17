@@ -44,7 +44,7 @@ impl PMSpotlightApp {
         browser.set_text_size(BROWSER_TEXT_SIZE);
         input.set_trigger(CallbackTrigger::Changed);
 
-        Self::callback_update_list(&mut input, sender.clone());
+        Self::callback_perform_search(&mut input, sender.clone());
         Self::fltk_event_move_from_input_to_list(&mut input, sender.clone());
         Self::fltk_event_select_list_entry(&mut browser, sender.clone());
 
@@ -75,7 +75,6 @@ impl PMSpotlightApp {
                     FocusOnList => {
                         self.message_event_focus_on_list();
                     }
-
                     ExecuteListEntry(entry) => {
                         self.message_event_execute_entry(entry);
                     }
@@ -88,7 +87,7 @@ impl PMSpotlightApp {
      * Callbacks
      ***************************************************************************/
 
-    fn callback_update_list(input: &mut Input, sender: Sender<MessageEvent>) {
+    fn callback_perform_search(input: &mut Input, sender: Sender<MessageEvent>) {
         input.set_callback(move |input| {
             let pattern = input.value();
             sender.send(Search(pattern));
@@ -152,7 +151,15 @@ impl PMSpotlightApp {
     }
 
     fn message_event_update_list(&mut self, entries: Vec<SearchResultEntry>) {
-        self.set_list_entries(entries);
+        for SearchResultEntry { icon, text, data } in entries {
+            if let Some(data) = data {
+                self.browser.add_with_data(&text, data);
+            } else {
+                self.browser.add(&text);
+            }
+
+            self.browser.set_icon(self.browser.size(), icon);
+        }
     }
 
     fn message_event_focus_on_list(&mut self) {
@@ -168,21 +175,5 @@ impl PMSpotlightApp {
         self.input.set_value("");
         set_focus(&self.input);
         self.browser.clear();
-    }
-
-    /***************************************************************************
-     * Helpers
-     ***************************************************************************/
-
-    fn set_list_entries(&mut self, entries: Vec<SearchResultEntry>) {
-        for SearchResultEntry { icon, text, data } in entries {
-            if let Some(data) = data {
-                self.browser.add_with_data(&text, data);
-            } else {
-                self.browser.add(&text);
-            }
-
-            self.browser.set_icon(self.browser.size(), icon);
-        }
     }
 }
