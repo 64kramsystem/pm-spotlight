@@ -7,6 +7,6 @@ pub trait Searcher {
     // Can run in a separate thread or not, but in the latter case, the search **must** be so fast that
     // it's immediate from a user perspective.
     //
-    fn search(&mut self, pattern: String, sender: Sender<MessageEvent>);
+    fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32);
     fn execute(&self, value: String);
 }
