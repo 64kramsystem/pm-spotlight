@@ -1,3 +1,5 @@
+use std::{os::unix::prelude::CommandExt, process::Command};
+
 use fltk::app::Sender;
 
 use regex::Regex;
@@ -188,6 +190,13 @@ impl Searcher for FileSearcher {
     }
 
     fn execute(&self, filename: String) {
-        println!("WRITEME: execute {}", filename);
+        // This is Unix-specific, in two ways:
+        //
+        // - it uses xdg-open
+        // - exec() will replace the pm-spotlight image with the executed program (unless it errors)
+        //
+        // this is currently fine.
+        //
+        Command::new("xdg-open").args([filename]).exec();
     }
 }
