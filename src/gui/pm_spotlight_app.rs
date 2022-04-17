@@ -150,7 +150,7 @@ impl PMSpotlightApp {
         self.current_searcher = self.search_manager.find_provider(&pattern);
 
         if let Some(searcher) = &mut self.current_searcher {
-            let search_result = searcher.search(&pattern);
+            let search_result = searcher.search(pattern);
             self.set_list_entries(search_result);
         }
     }

@@ -12,6 +12,6 @@ impl SearchManager {
 
         searchers
             .into_iter()
-            .find(|searcher| searcher.handles(&pattern))
+            .find(|searcher| searcher.handles(pattern))
     }
 }
