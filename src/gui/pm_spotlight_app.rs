@@ -77,8 +77,8 @@ impl PMSpotlightApp {
                     FocusOnBrowser => {
                         self.message_event_focus_on_browser();
                     }
-                    ExecuteEntry(entry) => {
-                        self.message_event_execute_entry(entry);
+                    ExecuteEntry => {
+                        self.message_event_execute_entry();
                     }
                 }
             }
@@ -117,19 +117,9 @@ impl PMSpotlightApp {
     ) {
         // It seems that Enter-initiated callback is not supported for browsers.
         //
-        browser.handle(move |browser, event| {
+        browser.handle(move |_browser, event| {
             if event == Event::KeyDown && app::event_key() == Key::Enter {
-                let selected_line = if browser.value() > 0 {
-                    browser.value()
-                } else if browser.size() >= 0 {
-                    1
-                } else {
-                    return true;
-                };
-
-                let entry = unsafe { browser.data(selected_line) }.unwrap();
-                sender.send(ExecuteEntry(entry));
-
+                sender.send(ExecuteEntry);
                 return true;
             }
 
@@ -171,7 +161,17 @@ impl PMSpotlightApp {
         }
     }
 
-    fn message_event_execute_entry(&mut self, entry: SearchResultEntry) {
+    fn message_event_execute_entry(&mut self) {
+        let selected_line = if self.browser.value() > 0 {
+            self.browser.value()
+        } else if self.browser.size() >= 0 {
+            1
+        } else {
+            return;
+        };
+
+        let entry: SearchResultEntry = unsafe { self.browser.data(selected_line) }.unwrap();
+
         if self.current_search_id == entry.search_id {
             self.search_manager
                 .execute(entry.value.unwrap_or(entry.label));
