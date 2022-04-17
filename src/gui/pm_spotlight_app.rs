@@ -172,7 +172,7 @@ impl PMSpotlightApp {
     fn message_event_execute_entry(&mut self) {
         let selected_line = if self.browser.value() > 0 {
             self.browser.value()
-        } else if self.browser.size() >= 0 {
+        } else if self.browser.size() > 0 {
             1
         } else {
             return;
