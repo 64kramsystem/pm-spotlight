@@ -8,9 +8,7 @@ use fltk::{
     window::Window,
 };
 
-use crate::search::{
-    search_manager::SearchManager, search_result_entry::SearchResultEntry, searcher::Searcher,
-};
+use crate::search::{search_manager::SearchManager, search_result_entry::SearchResultEntry};
 
 use super::message_event::MessageEvent::{self, *};
 
@@ -23,8 +21,8 @@ const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 
 pub struct PMSpotlightApp {
     search_manager: SearchManager,
-    current_searcher: Option<Box<dyn Searcher>>,
     app: App,
+    sender: Sender<MessageEvent>,
     receiver: Receiver<MessageEvent>,
     browser: HoldBrowser,
     input: Input,
@@ -56,8 +54,8 @@ impl PMSpotlightApp {
 
         Self {
             search_manager,
-            current_searcher: None,
             app,
+            sender,
             receiver,
             browser,
             input,
@@ -68,8 +66,11 @@ impl PMSpotlightApp {
         while self.app.wait() {
             if let Some(event) = self.receiver.recv() {
                 match event {
-                    UpdateList(pattern) => {
-                        self.message_event_update_list(pattern);
+                    Search(pattern) => {
+                        self.message_event_search(pattern);
+                    }
+                    UpdateList(entries) => {
+                        self.message_event_update_list(entries);
                     }
                     FocusOnList => {
                         self.message_event_focus_on_list();
@@ -89,7 +90,8 @@ impl PMSpotlightApp {
 
     fn callback_update_list(input: &mut Input, sender: Sender<MessageEvent>) {
         input.set_callback(move |input| {
-            sender.send(UpdateList(input.value()));
+            let pattern = input.value();
+            sender.send(Search(pattern));
         });
     }
 
@@ -144,15 +146,13 @@ impl PMSpotlightApp {
      * MessageEvent handlers
      ***************************************************************************/
 
-    fn message_event_update_list(&mut self, pattern: String) {
+    fn message_event_search(&mut self, pattern: String) {
         self.browser.clear();
+        self.search_manager.search(pattern, self.sender.clone());
+    }
 
-        self.current_searcher = self.search_manager.find_provider(&pattern);
-
-        if let Some(searcher) = &mut self.current_searcher {
-            let search_result = searcher.search(pattern);
-            self.set_list_entries(search_result);
-        }
+    fn message_event_update_list(&mut self, entries: Vec<SearchResultEntry>) {
+        self.set_list_entries(entries);
     }
 
     fn message_event_focus_on_list(&mut self) {
@@ -163,17 +163,11 @@ impl PMSpotlightApp {
     }
 
     fn message_event_execute_entry(&mut self, entry: String) {
-        // In line of theory (but probably impossible) in order for self.current_searcher to be None,
-        // the user should have typed something without a corresponding searcher between executing an
-        // entry, and the execution message being processed.
-        //
-        if let Some(searcher) = &self.current_searcher {
-            searcher.execute(entry);
+        self.search_manager.execute(entry);
 
-            self.input.set_value("");
-            set_focus(&self.input);
-            self.browser.clear();
-        }
+        self.input.set_value("");
+        set_focus(&self.input);
+        self.browser.clear();
     }
 
     /***************************************************************************

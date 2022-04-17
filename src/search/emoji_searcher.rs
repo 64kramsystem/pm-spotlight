@@ -1,8 +1,14 @@
-use fltk::image::{PngImage, SharedImage};
+use fltk::{
+    app::Sender,
+    image::{PngImage, SharedImage},
+};
 use phf::phf_map;
 
 use super::{search_result_entry::SearchResultEntry, searcher::Searcher};
-use crate::helpers::clipboard_management::copy_to_clipboard;
+use crate::{
+    gui::message_event::MessageEvent::{self, UpdateList},
+    helpers::clipboard_management::copy_to_clipboard,
+};
 
 const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "👍" => ("+1, thumbs up",                                           include_bytes!("../../resources/emoji_icons/thumbs_up.png")),
@@ -135,11 +141,11 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(":")
     }
 
-    fn search(&mut self, pattern: String) -> Vec<SearchResultEntry> {
+    fn search(&mut self, pattern: String, sender: Sender<MessageEvent>) {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if pattern.len() > 0 {
-            EMOJI_ICON_PATTERNS
+            let search_result = EMOJI_ICON_PATTERNS
                 .into_iter()
                 .filter_map(|(emoji, (patterns, image_bytes))| {
                     if patterns.contains(&pattern) {
@@ -155,9 +161,9 @@ impl Searcher for EmojiSearcher {
                         None
                     }
                 })
-                .collect()
-        } else {
-            vec![]
+                .collect();
+
+            sender.send(UpdateList(search_result));
         }
     }
 
