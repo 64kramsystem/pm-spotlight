@@ -1,7 +1,7 @@
 use fltk::image::{PngImage, SharedImage};
 use phf::phf_map;
 
-use super::searcher::Searcher;
+use super::{search_result_entry::SearchResultEntry, searcher::Searcher};
 use crate::helpers::clipboard_management::copy_to_clipboard;
 
 const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
@@ -135,7 +135,7 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(":")
     }
 
-    fn search(&mut self, pattern: &str) -> Vec<(Option<SharedImage>, String, Option<String>)> {
+    fn search(&mut self, pattern: &str) -> Vec<SearchResultEntry> {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if pattern.len() > 0 {
@@ -145,7 +145,8 @@ impl Searcher for EmojiSearcher {
                     if patterns.contains(&pattern) {
                         let shared_image =
                             SharedImage::from_image(PngImage::from_data(image_bytes).unwrap());
-                        Some((
+
+                        Some(SearchResultEntry::new(
                             shared_image.ok(),
                             patterns.to_string(),
                             Some(emoji.to_string()),

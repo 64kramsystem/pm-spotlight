@@ -3,13 +3,15 @@ use fltk::{
     browser::HoldBrowser,
     enums::{CallbackTrigger, Event, Key},
     group::Pack,
-    image::SharedImage,
     input::Input,
     prelude::*,
     window::Window,
 };
 
-use crate::search::{searcher::Searcher, searchers_provider::SearchersProvider};
+use crate::search::{
+    search_result_entry::SearchResultEntry, searcher::Searcher,
+    searchers_provider::SearchersProvider,
+};
 
 use super::message_event::MessageEvent::{self, *};
 
@@ -179,12 +181,12 @@ impl PMSpotlightApp {
      * Helpers
      ***************************************************************************/
 
-    fn set_list_entries(&mut self, entries: Vec<(Option<SharedImage>, String, Option<String>)>) {
-        for (icon, entry_text, entry_data) in entries {
-            if let Some(entry_data) = entry_data {
-                self.browser.add_with_data(&entry_text, entry_data);
+    fn set_list_entries(&mut self, entries: Vec<SearchResultEntry>) {
+        for SearchResultEntry { icon, text, data } in entries {
+            if let Some(data) = data {
+                self.browser.add_with_data(&text, data);
             } else {
-                self.browser.add(&entry_text);
+                self.browser.add(&text);
             }
 
             self.browser.set_icon(self.browser.size(), icon);

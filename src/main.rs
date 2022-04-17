@@ -5,6 +5,7 @@ mod gui {
 
 mod search {
     pub mod emoji_searcher;
+    pub mod search_result_entry;
     pub mod searcher;
     pub mod searchers_provider;
 }
