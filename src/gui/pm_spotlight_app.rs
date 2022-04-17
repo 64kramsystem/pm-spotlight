@@ -46,7 +46,7 @@ impl PMSpotlightApp {
         input.set_trigger(CallbackTrigger::Changed);
 
         Self::callback_start_search(&mut input, sender.clone());
-        Self::fltk_event_focus_on_browser(&mut input, sender.clone());
+        Self::fltk_event_list_execute_entry_and_focus_on_browser(&mut input, sender.clone());
         Self::fltk_event_execute_entry_from_browser(&mut browser, sender.clone());
 
         pack.end();
@@ -100,9 +100,17 @@ impl PMSpotlightApp {
      * FLTK event handlers
      ***************************************************************************/
 
-    fn fltk_event_focus_on_browser(input: &mut Input, sender: Sender<MessageEvent>) {
+    // Can't use multiple handlers on the same widget.
+    //
+    fn fltk_event_list_execute_entry_and_focus_on_browser(
+        input: &mut Input,
+        sender: Sender<MessageEvent>,
+    ) {
         input.handle(move |_input, event| {
-            if event == Event::KeyDown && app::event_key() == Key::Down {
+            if event == Event::KeyDown && app::event_key() == Key::Enter {
+                sender.send(ExecuteEntry);
+                return true;
+            } else if event == Event::KeyDown && app::event_key() == Key::Down {
                 sender.send(FocusOnBrowser);
                 return true;
             }
