@@ -27,6 +27,10 @@ impl SearchManager {
         //
         self.current_search_id += 1;
 
+        if let Some(searcher) = &mut self.current_searcher {
+            searcher.stop();
+        }
+
         self.current_searcher = Self::find_searcher(&pattern);
 
         if let Some(searcher) = &mut self.current_searcher {
