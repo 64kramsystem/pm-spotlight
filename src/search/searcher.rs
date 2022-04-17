@@ -8,5 +8,5 @@ pub trait Searcher {
     // it's immediate from a user perspective.
     //
     fn search(&mut self, pattern: String, sender: Sender<MessageEvent>);
-    fn execute(&self, entry: String);
+    fn execute(&self, value: String);
 }

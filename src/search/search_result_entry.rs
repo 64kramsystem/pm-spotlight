@@ -3,12 +3,16 @@ use fltk::image::SharedImage;
 #[derive(Clone)]
 pub struct SearchResultEntry {
     pub icon: Option<SharedImage>,
-    pub text: String,
-    pub data: Option<String>,
+    pub label: String,
+    pub value: Option<String>,
 }
 
 impl SearchResultEntry {
-    pub fn new(icon: Option<SharedImage>, text: String, data: Option<String>) -> Self {
-        Self { icon, text, data }
+    pub fn new(icon: Option<SharedImage>, text: String, value: Option<String>) -> Self {
+        Self {
+            icon,
+            label: text,
+            value,
+        }
     }
 }

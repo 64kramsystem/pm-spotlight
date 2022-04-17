@@ -153,10 +153,10 @@ impl PMSpotlightApp {
             // the data strictly needed to perform the execute action, but it's an optimization that
             // doesn't matter, at least now.
             //
-            let text = entry.text.clone();
+            let label = entry.label.clone();
             let icon = entry.icon.clone();
 
-            self.browser.add_with_data(&text, entry);
+            self.browser.add_with_data(&label, entry);
             self.browser.set_icon(self.browser.size(), icon);
         }
     }
@@ -170,7 +170,7 @@ impl PMSpotlightApp {
 
     fn message_event_execute_entry(&mut self, entry: SearchResultEntry) {
         self.search_manager
-            .execute(entry.data.unwrap_or(entry.text));
+            .execute(entry.value.unwrap_or(entry.label));
 
         self.input.set_value("");
         set_focus(&self.input);

@@ -23,9 +23,9 @@ impl SearchManager {
         }
     }
 
-    pub fn execute(&mut self, entry: String) {
+    pub fn execute(&mut self, value: String) {
         if let Some(searcher) = &mut self.current_searcher {
-            searcher.execute(entry)
+            searcher.execute(value)
         }
     }
 
