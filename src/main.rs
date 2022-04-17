@@ -5,9 +5,9 @@ mod gui {
 
 mod search {
     pub mod emoji_searcher;
+    pub mod search_manager;
     pub mod search_result_entry;
     pub mod searcher;
-    pub mod searchers_provider;
 }
 
 mod helpers {
@@ -20,10 +20,10 @@ mod config {
 
 use config::config_manager::ConfigManager;
 use gui::pm_spotlight_app::PMSpotlightApp;
-use search::searchers_provider::SearchersProvider;
+use search::search_manager::SearchManager;
 
 fn main() {
     let _config = ConfigManager::load_configuration();
-    let searchers_provider = SearchersProvider::new();
-    PMSpotlightApp::build(searchers_provider).run();
+    let search_manager = SearchManager::new();
+    PMSpotlightApp::build(search_manager).run();
 }

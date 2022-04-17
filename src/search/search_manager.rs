@@ -1,8 +1,8 @@
 use super::{emoji_searcher::EmojiSearcher, searcher::Searcher};
 
-pub struct SearchersProvider {}
+pub struct SearchManager {}
 
-impl SearchersProvider {
+impl SearchManager {
     pub fn new() -> Self {
         Self {}
     }

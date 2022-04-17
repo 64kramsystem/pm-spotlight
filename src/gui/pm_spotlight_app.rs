@@ -9,8 +9,7 @@ use fltk::{
 };
 
 use crate::search::{
-    search_result_entry::SearchResultEntry, searcher::Searcher,
-    searchers_provider::SearchersProvider,
+    search_manager::SearchManager, search_result_entry::SearchResultEntry, searcher::Searcher,
 };
 
 use super::message_event::MessageEvent::{self, *};
@@ -23,7 +22,7 @@ const WINDOW_HEIGHT: i32 = 500;
 const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 
 pub struct PMSpotlightApp {
-    searchers_provider: SearchersProvider,
+    search_manager: SearchManager,
     current_searcher: Option<Box<dyn Searcher>>,
     app: App,
     receiver: Receiver<MessageEvent>,
@@ -32,7 +31,7 @@ pub struct PMSpotlightApp {
 }
 
 impl PMSpotlightApp {
-    pub fn build(searchers_provider: SearchersProvider) -> Self {
+    pub fn build(search_manager: SearchManager) -> Self {
         let app = App::default();
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -56,7 +55,7 @@ impl PMSpotlightApp {
         window.show();
 
         Self {
-            searchers_provider,
+            search_manager,
             current_searcher: None,
             app,
             receiver,
@@ -148,7 +147,7 @@ impl PMSpotlightApp {
     fn message_event_update_list(&mut self, pattern: String) {
         self.browser.clear();
 
-        self.current_searcher = self.searchers_provider.find_provider(&pattern);
+        self.current_searcher = self.search_manager.find_provider(&pattern);
 
         if let Some(searcher) = &mut self.current_searcher {
             let search_result = searcher.search(&pattern);
