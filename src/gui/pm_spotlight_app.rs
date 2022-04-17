@@ -45,9 +45,9 @@ impl PMSpotlightApp {
         browser.set_text_size(BROWSER_TEXT_SIZE);
         input.set_trigger(CallbackTrigger::Changed);
 
-        Self::callback_perform_search(&mut input, sender.clone());
-        Self::fltk_event_move_from_input_to_list(&mut input, sender.clone());
-        Self::fltk_event_select_list_entry(&mut browser, sender.clone());
+        Self::callback_start_search(&mut input, sender.clone());
+        Self::fltk_event_list_execute_entry_and_focus_on_browser(&mut input, sender.clone());
+        Self::fltk_event_execute_entry_from_browser(&mut browser, sender.clone());
 
         pack.end();
         window.end();
@@ -68,17 +68,17 @@ impl PMSpotlightApp {
         while self.app.wait() {
             if let Some(event) = self.receiver.recv() {
                 match event {
-                    Search(pattern) => {
-                        self.message_event_search(pattern);
+                    StartSearch(pattern) => {
+                        self.message_event_start_search(pattern);
                     }
                     UpdateList(entries) => {
                         self.message_event_update_list(entries);
                     }
-                    FocusOnList => {
-                        self.message_event_focus_on_list();
+                    FocusOnBrowser => {
+                        self.message_event_focus_on_browser();
                     }
-                    ExecuteListEntry(entry) => {
-                        self.message_event_execute_entry(entry);
+                    ExecuteEntry => {
+                        self.message_event_execute_entry();
                     }
                 }
             }
@@ -89,10 +89,10 @@ impl PMSpotlightApp {
      * Callbacks
      ***************************************************************************/
 
-    fn callback_perform_search(input: &mut Input, sender: Sender<MessageEvent>) {
+    fn callback_start_search(input: &mut Input, sender: Sender<MessageEvent>) {
         input.set_callback(move |input| {
             let pattern = input.value();
-            sender.send(Search(pattern));
+            sender.send(StartSearch(pattern));
         });
     }
 
@@ -100,10 +100,18 @@ impl PMSpotlightApp {
      * FLTK event handlers
      ***************************************************************************/
 
-    fn fltk_event_move_from_input_to_list(input: &mut Input, sender: Sender<MessageEvent>) {
+    // Can't use multiple handlers on the same widget.
+    //
+    fn fltk_event_list_execute_entry_and_focus_on_browser(
+        input: &mut Input,
+        sender: Sender<MessageEvent>,
+    ) {
         input.handle(move |_input, event| {
-            if event == Event::KeyDown && app::event_key() == Key::Down {
-                sender.send(FocusOnList);
+            if event == Event::KeyDown && app::event_key() == Key::Enter {
+                sender.send(ExecuteEntry);
+                return true;
+            } else if event == Event::KeyDown && app::event_key() == Key::Down {
+                sender.send(FocusOnBrowser);
                 return true;
             }
 
@@ -111,28 +119,15 @@ impl PMSpotlightApp {
         });
     }
 
-    fn fltk_event_select_list_entry(browser: &mut HoldBrowser, sender: Sender<MessageEvent>) {
+    fn fltk_event_execute_entry_from_browser(
+        browser: &mut HoldBrowser,
+        sender: Sender<MessageEvent>,
+    ) {
         // It seems that Enter-initiated callback is not supported for browsers.
         //
-        browser.handle(move |browser, event| {
-            // An alternative solution was to reset when tapping key up from the topmost Browser entry,
-            // but this is not feasible with fltk(-rs), because:
-            //
-            // - the event is fired after the selection is changed
-            // - the selection doesn't go above the first entry
-            //
+        browser.handle(move |_browser, event| {
             if event == Event::KeyDown && app::event_key() == Key::Enter {
-                let selected_line = if browser.value() > 0 {
-                    browser.value()
-                } else if browser.size() >= 0 {
-                    1
-                } else {
-                    return true;
-                };
-
-                let entry = unsafe { browser.data(selected_line) }.unwrap();
-                sender.send(ExecuteListEntry(entry));
-
+                sender.send(ExecuteEntry);
                 return true;
             }
 
@@ -144,7 +139,7 @@ impl PMSpotlightApp {
      * MessageEvent handlers
      ***************************************************************************/
 
-    fn message_event_search(&mut self, pattern: String) {
+    fn message_event_start_search(&mut self, pattern: String) {
         self.browser.clear();
         self.current_search_id = self.search_manager.search(pattern, self.sender.clone());
     }
@@ -167,14 +162,24 @@ impl PMSpotlightApp {
         }
     }
 
-    fn message_event_focus_on_list(&mut self) {
+    fn message_event_focus_on_browser(&mut self) {
         if self.browser.size() > 0 {
             set_focus(&self.browser);
             self.browser.select(1);
         }
     }
 
-    fn message_event_execute_entry(&mut self, entry: SearchResultEntry) {
+    fn message_event_execute_entry(&mut self) {
+        let selected_line = if self.browser.value() > 0 {
+            self.browser.value()
+        } else if self.browser.size() > 0 {
+            1
+        } else {
+            return;
+        };
+
+        let entry: SearchResultEntry = unsafe { self.browser.data(selected_line) }.unwrap();
+
         if self.current_search_id == entry.search_id {
             self.search_manager
                 .execute(entry.value.unwrap_or(entry.label));

@@ -1,8 +1,8 @@
 use crate::search::search_result_entry::SearchResultEntry;
 
 pub enum MessageEvent {
-    Search(String),
+    StartSearch(String),
     UpdateList(Vec<SearchResultEntry>),
-    FocusOnList,
-    ExecuteListEntry(SearchResultEntry),
+    FocusOnBrowser,
+    ExecuteEntry,
 }
