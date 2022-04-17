@@ -1,10 +1,11 @@
 use fltk::app::Sender;
 
-use crate::gui::message_event::MessageEvent;
+use crate::{config::config_manager::Config, gui::message_event::MessageEvent};
 
 use super::{emoji_searcher::EmojiSearcher, searcher::Searcher};
 
 pub struct SearchManager {
+    config: Config,
     current_searcher: Option<Box<dyn Searcher>>,
     // This type performs dumb id generation, but no checks. The reason is that checks must be performed
     // by the App type (e.g. display or not the entries sent from a search), so it's cleaner to perform
@@ -14,8 +15,9 @@ pub struct SearchManager {
 }
 
 impl SearchManager {
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
+            config,
             current_searcher: None,
             current_search_id: 0,
         }

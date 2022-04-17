@@ -23,7 +23,7 @@ use gui::pm_spotlight_app::PMSpotlightApp;
 use search::search_manager::SearchManager;
 
 fn main() {
-    let _config = ConfigManager::load_configuration();
-    let search_manager = SearchManager::new();
+    let config = ConfigManager::load_configuration();
+    let search_manager = SearchManager::new(config);
     PMSpotlightApp::build(search_manager).run();
 }
