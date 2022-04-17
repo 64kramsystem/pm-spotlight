@@ -2,7 +2,7 @@ use fltk::app::Sender;
 
 use crate::{config::config_manager::Config, gui::message_event::MessageEvent};
 
-use super::{emoji_searcher::EmojiSearcher, searcher::Searcher};
+use super::{emoji_searcher::EmojiSearcher, file_searcher::FileSearcher, searcher::Searcher};
 
 pub struct SearchManager {
     config: Config,
@@ -33,7 +33,7 @@ impl SearchManager {
             searcher.stop();
         }
 
-        self.current_searcher = Self::find_searcher(&pattern);
+        self.current_searcher = self.find_searcher(&pattern);
 
         if let Some(searcher) = &mut self.current_searcher {
             searcher.search(pattern, sender, self.current_search_id);
@@ -48,8 +48,14 @@ impl SearchManager {
         }
     }
 
-    fn find_searcher(pattern: &str) -> Option<Box<dyn Searcher>> {
-        let searchers: Vec<Box<dyn Searcher>> = vec![Box::new(EmojiSearcher::new())];
+    fn find_searcher(&self, pattern: &str) -> Option<Box<dyn Searcher>> {
+        // WATCH OUT!! The ordering matters - specialized searchers must go first, since the file always
+        // handles the pattern, and prevents the following ones from running.
+        //
+        let searchers: Vec<Box<dyn Searcher>> = vec![
+            Box::new(EmojiSearcher::new()),
+            Box::new(FileSearcher::new(self.config.clone())),
+        ];
 
         searchers
             .into_iter()
