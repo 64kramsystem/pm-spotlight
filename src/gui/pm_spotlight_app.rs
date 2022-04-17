@@ -128,11 +128,8 @@ impl PMSpotlightApp {
                     return true;
                 };
 
-                if let Some::<String>(text) = unsafe { browser.data(selected_line) } {
-                    sender.send(ExecuteListEntry(text));
-                } else if let Some(text) = browser.text(selected_line) {
-                    sender.send(ExecuteListEntry(text));
-                }
+                let entry = unsafe { browser.data(selected_line) }.unwrap();
+                sender.send(ExecuteListEntry(entry));
 
                 return true;
             }
@@ -151,13 +148,15 @@ impl PMSpotlightApp {
     }
 
     fn message_event_update_list(&mut self, entries: Vec<SearchResultEntry>) {
-        for SearchResultEntry { icon, text, data } in entries {
-            if let Some(data) = data {
-                self.browser.add_with_data(&text, data);
-            } else {
-                self.browser.add(&text);
-            }
+        for entry in entries {
+            // This is wasteful, but the browser wants to own the data. We could keep in #data just
+            // the data strictly needed to perform the execute action, but it's an optimization that
+            // doesn't matter, at least now.
+            //
+            let text = entry.text.clone();
+            let icon = entry.icon.clone();
 
+            self.browser.add_with_data(&text, entry);
             self.browser.set_icon(self.browser.size(), icon);
         }
     }
@@ -169,8 +168,9 @@ impl PMSpotlightApp {
         }
     }
 
-    fn message_event_execute_entry(&mut self, entry: String) {
-        self.search_manager.execute(entry);
+    fn message_event_execute_entry(&mut self, entry: SearchResultEntry) {
+        self.search_manager
+            .execute(entry.data.unwrap_or(entry.text));
 
         self.input.set_value("");
         set_focus(&self.input);

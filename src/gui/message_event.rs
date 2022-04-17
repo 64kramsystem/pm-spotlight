@@ -4,5 +4,5 @@ pub enum MessageEvent {
     Search(String),
     UpdateList(Vec<SearchResultEntry>),
     FocusOnList,
-    ExecuteListEntry(String),
+    ExecuteListEntry(SearchResultEntry),
 }

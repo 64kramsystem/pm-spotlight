@@ -1,5 +1,6 @@
 use fltk::image::SharedImage;
 
+#[derive(Clone)]
 pub struct SearchResultEntry {
     pub icon: Option<SharedImage>,
     pub text: String,
