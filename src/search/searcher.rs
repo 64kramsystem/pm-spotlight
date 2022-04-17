@@ -4,6 +4,10 @@ use crate::gui::message_event::MessageEvent;
 
 pub trait Searcher {
     fn handles(&self, pattern: &str) -> bool;
+
+    // The implementation must take care of not running on empty patterns. This is because "empty
+    // pattern" is different from "empty string".
+    //
     // Can run in a separate thread or not, but in the latter case, the search **must** be so fast that
     // it's immediate from a user perspective.
     //
