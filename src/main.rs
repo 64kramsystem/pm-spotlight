@@ -12,6 +12,7 @@ mod search {
 
 mod helpers {
     pub mod clipboard_management;
+    pub mod filenames;
 }
 
 mod config {
