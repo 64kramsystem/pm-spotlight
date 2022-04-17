@@ -3,13 +3,12 @@ use fltk::{
     browser::HoldBrowser,
     enums::{CallbackTrigger, Event, Key},
     group::Pack,
-    image::SharedImage,
     input::Input,
     prelude::*,
     window::Window,
 };
 
-use crate::search::{searcher::Searcher, searchers_provider::SearchersProvider};
+use crate::search::{search_manager::SearchManager, search_result_entry::SearchResultEntry};
 
 use super::message_event::MessageEvent::{self, *};
 
@@ -21,16 +20,16 @@ const WINDOW_HEIGHT: i32 = 500;
 const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 
 pub struct PMSpotlightApp {
-    searchers_provider: SearchersProvider,
-    current_searcher: Option<Box<dyn Searcher>>,
+    search_manager: SearchManager,
     app: App,
+    sender: Sender<MessageEvent>,
     receiver: Receiver<MessageEvent>,
     browser: HoldBrowser,
     input: Input,
 }
 
 impl PMSpotlightApp {
-    pub fn build(searchers_provider: SearchersProvider) -> Self {
+    pub fn build(search_manager: SearchManager) -> Self {
         let app = App::default();
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -45,7 +44,7 @@ impl PMSpotlightApp {
         browser.set_text_size(BROWSER_TEXT_SIZE);
         input.set_trigger(CallbackTrigger::Changed);
 
-        Self::callback_update_list(&mut input, sender.clone());
+        Self::callback_perform_search(&mut input, sender.clone());
         Self::fltk_event_move_from_input_to_list(&mut input, sender.clone());
         Self::fltk_event_select_list_entry(&mut browser, sender.clone());
 
@@ -54,9 +53,9 @@ impl PMSpotlightApp {
         window.show();
 
         Self {
-            searchers_provider,
-            current_searcher: None,
+            search_manager,
             app,
+            sender,
             receiver,
             browser,
             input,
@@ -67,13 +66,15 @@ impl PMSpotlightApp {
         while self.app.wait() {
             if let Some(event) = self.receiver.recv() {
                 match event {
-                    UpdateList(pattern) => {
-                        self.message_event_update_list(pattern);
+                    Search(pattern) => {
+                        self.message_event_search(pattern);
+                    }
+                    UpdateList(entries) => {
+                        self.message_event_update_list(entries);
                     }
                     FocusOnList => {
                         self.message_event_focus_on_list();
                     }
-
                     ExecuteListEntry(entry) => {
                         self.message_event_execute_entry(entry);
                     }
@@ -86,9 +87,10 @@ impl PMSpotlightApp {
      * Callbacks
      ***************************************************************************/
 
-    fn callback_update_list(input: &mut Input, sender: Sender<MessageEvent>) {
+    fn callback_perform_search(input: &mut Input, sender: Sender<MessageEvent>) {
         input.set_callback(move |input| {
-            sender.send(UpdateList(input.value()));
+            let pattern = input.value();
+            sender.send(Search(pattern));
         });
     }
 
@@ -126,11 +128,8 @@ impl PMSpotlightApp {
                     return true;
                 };
 
-                if let Some::<String>(text) = unsafe { browser.data(selected_line) } {
-                    sender.send(ExecuteListEntry(text));
-                } else if let Some(text) = browser.text(selected_line) {
-                    sender.send(ExecuteListEntry(text));
-                }
+                let entry = unsafe { browser.data(selected_line) }.unwrap();
+                sender.send(ExecuteListEntry(entry));
 
                 return true;
             }
@@ -143,14 +142,22 @@ impl PMSpotlightApp {
      * MessageEvent handlers
      ***************************************************************************/
 
-    fn message_event_update_list(&mut self, pattern: String) {
+    fn message_event_search(&mut self, pattern: String) {
         self.browser.clear();
+        self.search_manager.search(pattern, self.sender.clone());
+    }
 
-        self.current_searcher = self.searchers_provider.find_provider(&pattern);
+    fn message_event_update_list(&mut self, entries: Vec<SearchResultEntry>) {
+        for entry in entries {
+            // This is wasteful, but the browser wants to own the data. We could keep in #data just
+            // the data strictly needed to perform the execute action, but it's an optimization that
+            // doesn't matter, at least now.
+            //
+            let label = entry.label.clone();
+            let icon = entry.icon.clone();
 
-        if let Some(searcher) = &mut self.current_searcher {
-            let search_result = searcher.search(&pattern);
-            self.set_list_entries(search_result);
+            self.browser.add_with_data(&label, entry);
+            self.browser.set_icon(self.browser.size(), icon);
         }
     }
 
@@ -161,33 +168,12 @@ impl PMSpotlightApp {
         }
     }
 
-    fn message_event_execute_entry(&mut self, entry: String) {
-        // In line of theory (but probably impossible) in order for self.current_searcher to be None,
-        // the user should have typed something without a corresponding searcher between executing an
-        // entry, and the execution message being processed.
-        //
-        if let Some(searcher) = &self.current_searcher {
-            searcher.execute(entry);
+    fn message_event_execute_entry(&mut self, entry: SearchResultEntry) {
+        self.search_manager
+            .execute(entry.value.unwrap_or(entry.label));
 
-            self.input.set_value("");
-            set_focus(&self.input);
-            self.browser.clear();
-        }
-    }
-
-    /***************************************************************************
-     * Helpers
-     ***************************************************************************/
-
-    fn set_list_entries(&mut self, entries: Vec<(Option<SharedImage>, String, Option<String>)>) {
-        for (icon, entry_text, entry_data) in entries {
-            if let Some(entry_data) = entry_data {
-                self.browser.add_with_data(&entry_text, entry_data);
-            } else {
-                self.browser.add(&entry_text);
-            }
-
-            self.browser.set_icon(self.browser.size(), icon);
-        }
+        self.input.set_value("");
+        set_focus(&self.input);
+        self.browser.clear();
     }
 }
