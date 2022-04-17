@@ -13,10 +13,16 @@ mod helpers {
     pub mod clipboard_management;
 }
 
+mod config {
+    pub mod config_manager;
+}
+
+use config::config_manager::ConfigManager;
 use gui::pm_spotlight_app::PMSpotlightApp;
 use search::searchers_provider::SearchersProvider;
 
 fn main() {
+    let _config = ConfigManager::load_configuration();
     let searchers_provider = SearchersProvider::new();
     PMSpotlightApp::build(searchers_provider).run();
 }
