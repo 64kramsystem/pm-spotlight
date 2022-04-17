@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 const CONFIG_BASENAME: &str = ".pm-spotlight";
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub search_paths: Vec<String>,
     pub skip_paths: Vec<String>,

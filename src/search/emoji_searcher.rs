@@ -141,7 +141,7 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(":")
     }
 
-    fn search(&mut self, pattern: String, sender: Sender<MessageEvent>) {
+    fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32) {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if pattern.len() > 0 {
@@ -156,6 +156,7 @@ impl Searcher for EmojiSearcher {
                             shared_image.ok(),
                             patterns.to_string(),
                             Some(emoji.to_string()),
+                            search_id,
                         ))
                     } else {
                         None
