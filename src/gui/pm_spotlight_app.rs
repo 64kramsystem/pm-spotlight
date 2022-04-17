@@ -118,12 +118,6 @@ impl PMSpotlightApp {
         // It seems that Enter-initiated callback is not supported for browsers.
         //
         browser.handle(move |browser, event| {
-            // An alternative solution was to reset when tapping key up from the topmost Browser entry,
-            // but this is not feasible with fltk(-rs), because:
-            //
-            // - the event is fired after the selection is changed
-            // - the selection doesn't go above the first entry
-            //
             if event == Event::KeyDown && app::event_key() == Key::Enter {
                 let selected_line = if browser.value() > 0 {
                     browser.value()
