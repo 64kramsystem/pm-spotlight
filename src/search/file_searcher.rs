@@ -1,7 +1,4 @@
-use std::{
-    os::unix::prelude::CommandExt,
-    process::{self, Command},
-};
+use std::{os::unix::prelude::CommandExt, process::Command};
 
 use fltk::app::Sender;
 use walkdir::{DirEntry, WalkDir};
@@ -47,22 +44,15 @@ impl FileSearcher {
         // This can be easily done with a regex, but the crate adds 1.7 MB, and it's only used here.
         //
         if path.ends_with('}') {
-            let path_chars = path.chars().collect::<Vec<_>>();
-            let opening_brace = path_chars.iter().rev().skip(2).next();
+            let mut split = path.rsplitn(2, '{');
 
-            match opening_brace {
-                Some('{') => {
-                    let opening_brace_i = path_chars.len() - 3;
+            let mut depth_str = split.next().unwrap().to_string();
+            depth_str.pop();
+            depth = depth_str
+                .parse()
+                .expect("Expected number between braces in path '{}'");
 
-                    path = path_chars.iter().take(opening_brace_i).collect();
-                    let depth_char = *path_chars.iter().skip(opening_brace_i + 1).next().unwrap();
-                    depth = depth_char as usize - '0' as usize;
-                }
-                _ => {
-                    eprintln!("Error in path '{}' definition; with braces, the last three chars must be '{{N}}'", path);
-                    process::exit(1);
-                }
-            }
+            path = split.next().unwrap().to_string();
         }
 
         if path.starts_with('/') {
