@@ -3,6 +3,7 @@ use fltk::{
     image::{PngImage, SharedImage},
 };
 use phf::phf_map;
+use std::process;
 
 use super::{search_result_entry::SearchResultEntry, searcher::Searcher};
 use crate::{
@@ -170,5 +171,6 @@ impl Searcher for EmojiSearcher {
 
     fn execute(&self, emoji: String) {
         copy_to_clipboard(emoji);
+        process::exit(0);
     }
 }
