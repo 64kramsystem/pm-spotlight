@@ -1,8 +1,6 @@
 use std::{os::unix::prelude::CommandExt, process::Command};
 
 use fltk::app::Sender;
-
-use regex::Regex;
 use walkdir::{DirEntry, WalkDir};
 
 use super::{search_result_entry::SearchResultEntry, searcher::Searcher};
@@ -22,8 +20,8 @@ impl FileSearcher {
     pub fn new(config: Config) -> Self {
         let search_paths = config
             .search_paths
-            .iter()
-            .map(|path| Self::process_search_path_definition(path))
+            .into_iter()
+            .map(|path| Self::process_search_path_definition(&path))
             .collect::<Vec<_>>();
 
         let skip_paths = config
@@ -39,18 +37,26 @@ impl FileSearcher {
         }
     }
 
-    fn process_search_path_definition(mut path: &str) -> (String, usize) {
+    fn process_search_path_definition(path: &str) -> (String, usize) {
+        let mut path = path.to_string();
         let mut depth = 255;
 
-        let re = Regex::new(r"(.+)\{(\d)\}$").unwrap();
+        // This can be easily done with a regex, but the crate adds 1.7 MB, and it's only used here.
+        //
+        if path.ends_with('}') {
+            let mut split = path.rsplitn(2, '{');
 
-        if let Some(captures) = re.captures(path) {
-            path = captures.get(1).unwrap().as_str();
-            depth = captures.get(2).unwrap().as_str().parse().unwrap();
+            let mut depth_str = split.next().unwrap().to_string();
+            depth_str.pop();
+            depth = depth_str
+                .parse()
+                .expect("Expected number between braces in path '{}'");
+
+            path = split.next().unwrap().to_string();
         }
 
         if path.starts_with('/') {
-            (path.to_string(), depth)
+            (path, depth)
         } else {
             (
                 dirs::home_dir()
