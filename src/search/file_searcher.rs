@@ -153,7 +153,7 @@ impl Searcher for FileSearcher {
     }
 
     fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32) {
-        if pattern.is_empty() {
+        if pattern.chars().collect::<Vec<_>>().len() < 2 {
             return;
         }
 
