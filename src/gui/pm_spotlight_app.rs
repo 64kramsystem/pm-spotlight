@@ -3,6 +3,7 @@ use fltk::{
     browser::HoldBrowser,
     enums::{CallbackTrigger, Event, Key},
     group::Pack,
+    image::PngImage,
     input::Input,
     prelude::*,
     window::Window,
@@ -16,6 +17,8 @@ const WINDOW_TITLE: &str = "Poor Man's Spotlight!";
 
 const WINDOW_WIDTH: i32 = 350;
 const WINDOW_HEIGHT: i32 = 500;
+
+const WINDOW_ICON: &[u8] = include_bytes!("../../resources/window_icon/telescope.png");
 
 const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 
@@ -36,6 +39,8 @@ impl PMSpotlightApp {
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
             .with_label(WINDOW_TITLE);
         let pack = Pack::default().size_of(&window);
+
+        Self::set_window_icon(&mut window);
 
         let (sender, receiver) = app::channel();
 
@@ -62,6 +67,11 @@ impl PMSpotlightApp {
             browser,
             input,
         }
+    }
+
+    pub fn set_window_icon(window: &mut Window) {
+        let image = PngImage::from_data(WINDOW_ICON).unwrap();
+        window.set_icon(Some(image));
     }
 
     pub fn run(&mut self) {
