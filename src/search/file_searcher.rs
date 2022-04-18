@@ -1,8 +1,9 @@
-use std::{os::unix::prelude::CommandExt, process::Command};
+use std::{
+    os::unix::prelude::CommandExt,
+    process::{self, Command},
+};
 
 use fltk::app::Sender;
-
-use regex::Regex;
 use walkdir::{DirEntry, WalkDir};
 
 use super::{search_result_entry::SearchResultEntry, searcher::Searcher};
@@ -22,8 +23,8 @@ impl FileSearcher {
     pub fn new(config: Config) -> Self {
         let search_paths = config
             .search_paths
-            .iter()
-            .map(|path| Self::process_search_path_definition(path))
+            .into_iter()
+            .map(|path| Self::process_search_path_definition(&path))
             .collect::<Vec<_>>();
 
         let skip_paths = config
@@ -39,18 +40,33 @@ impl FileSearcher {
         }
     }
 
-    fn process_search_path_definition(mut path: &str) -> (String, usize) {
+    fn process_search_path_definition(path: &str) -> (String, usize) {
+        let mut path = path.to_string();
         let mut depth = 255;
 
-        let re = Regex::new(r"(.+)\{(\d)\}$").unwrap();
+        // This can be easily done with a regex, but the crate adds 1.7 MB, and it's only used here.
+        //
+        if path.ends_with('}') {
+            let path_chars = path.chars().collect::<Vec<_>>();
+            let opening_brace = path_chars.iter().rev().skip(2).next();
 
-        if let Some(captures) = re.captures(path) {
-            path = captures.get(1).unwrap().as_str();
-            depth = captures.get(2).unwrap().as_str().parse().unwrap();
+            match opening_brace {
+                Some('{') => {
+                    let opening_brace_i = path_chars.len() - 3;
+
+                    path = path_chars.iter().take(opening_brace_i).collect();
+                    let depth_char = *path_chars.iter().skip(opening_brace_i + 1).next().unwrap();
+                    depth = depth_char as usize - '0' as usize;
+                }
+                _ => {
+                    eprintln!("Error in path '{}' definition; with braces, the last three chars must be '{{N}}'", path);
+                    process::exit(1);
+                }
+            }
         }
 
         if path.starts_with('/') {
-            (path.to_string(), depth)
+            (path, depth)
         } else {
             (
                 dirs::home_dir()
