@@ -1,4 +1,4 @@
-use std::{os::unix::prelude::CommandExt, process::Command};
+use std::{os::unix::prelude::CommandExt, path::Path, process::Command};
 
 use fltk::app::Sender;
 use walkdir::{DirEntry, WalkDir};
@@ -179,9 +179,13 @@ impl Searcher for FileSearcher {
                 .filter_map(|e| Self::include_entry(&e.unwrap(), pattern))
         };
 
+        // Ignore nonexisting search paths; a legitimate use case is, for example, a shared config
+        // across multiple machines.
+        //
         let matching_fullnames = self
             .search_paths
             .iter()
+            .filter(|(path, _)| Path::new(path).is_dir())
             .flat_map(search_in_path)
             .collect::<Vec<String>>();
 
