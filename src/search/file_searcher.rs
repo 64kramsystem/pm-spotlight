@@ -116,17 +116,11 @@ impl FileSearcher {
             .any(|skip_re| skip_re.is_match(&fullname))
     }
 
-    fn include_entry(entry: &DirEntry, pattern: &str) -> Option<String> {
+    fn include_entry(entry: &DirEntry, re_pattern: &Regex) -> Option<String> {
         let path = entry.path();
+        let filename = path.file_name().unwrap().to_str().unwrap();
 
-        if path
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_lowercase()
-            .contains(pattern)
-        {
+        if re_pattern.is_match(filename) {
             Some(path.to_str().unwrap().to_string())
         } else {
             None
@@ -150,7 +144,9 @@ impl Searcher for FileSearcher {
             return;
         }
 
-        let pattern = &pattern.to_lowercase();
+        let mut pattern = pattern.replace('.', r"\.").replace('*', ".*");
+        pattern = format!("(?i){}", pattern);
+        let re_pattern = Regex::new(&pattern).unwrap();
 
         let search_in_path = |(search_path, depth): &(String, usize)| {
             let walker = WalkDir::new(search_path)
@@ -169,7 +165,7 @@ impl Searcher for FileSearcher {
             //
             walker
                 .into_iter()
-                .filter_map(|e| Self::include_entry(&e.unwrap(), pattern))
+                .filter_map(|e| Self::include_entry(&e.unwrap(), &re_pattern))
         };
 
         // Ignore nonexisting search paths; a legitimate use case is, for example, a shared config
