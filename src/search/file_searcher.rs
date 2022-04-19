@@ -11,6 +11,8 @@ use crate::{
     helpers::filenames::map_filenames_to_short_names,
 };
 
+const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_./]";
+
 pub struct FileSearcher {
     search_paths: Vec<(String, usize)>,
     skip_paths: Vec<(String, bool)>,
@@ -141,8 +143,14 @@ impl FileSearcher {
 }
 
 impl Searcher for FileSearcher {
-    fn handles(&self, _pattern: &str) -> bool {
-        true
+    fn handles(&self, pattern: &str) -> bool {
+        let re = Regex::new(DISALLOWED_PATH_CHARS).unwrap();
+
+        if re.is_match(pattern) {
+            panic!("Only alphanum and *_-./ are allowed");
+        } else {
+            true
+        }
     }
 
     fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32) {
