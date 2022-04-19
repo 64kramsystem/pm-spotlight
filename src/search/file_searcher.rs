@@ -17,6 +17,8 @@ pub struct FileSearcher {
     search_paths: Vec<(String, usize)>,
     skip_paths: Vec<Regex>,
     stop_search: bool,
+    // It's noticeably slow to instantiate once for each file skip test.
+    re_is_hidden: Regex,
 }
 
 impl FileSearcher {
@@ -37,6 +39,7 @@ impl FileSearcher {
             search_paths,
             skip_paths,
             stop_search: false,
+            re_is_hidden: Regex::new(r"/\.[^/]+$").unwrap(),
         }
     }
 
@@ -103,9 +106,7 @@ impl FileSearcher {
             return true;
         };
 
-        let is_hidden_re = Regex::new(r"/\.[^/]+$").unwrap();
-
-        if is_hidden_re.is_match(&fullname) {
+        if self.re_is_hidden.is_match(&fullname) {
             return true;
         }
 
