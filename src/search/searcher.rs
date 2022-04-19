@@ -15,6 +15,13 @@ pub trait Searcher {
 
     fn execute(&self, value: String);
 
+    // Alternate execute mode, activated by Shift+Enter; optional.
+    // Returns true if supported; false otherwise.
+    //
+    fn alt_execute(&self, _value: String) -> bool {
+        false
+    }
+
     // Implemented only when there is a separate thread.
     //
     fn stop(&mut self) {}

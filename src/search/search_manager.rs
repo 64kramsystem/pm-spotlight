@@ -48,6 +48,14 @@ impl SearchManager {
         }
     }
 
+    pub fn alt_execute(&mut self, value: String) -> bool {
+        if let Some(searcher) = &mut self.current_searcher {
+            searcher.alt_execute(value)
+        } else {
+            false
+        }
+    }
+
     fn find_searcher(&self, pattern: &str) -> Option<Box<dyn Searcher>> {
         // WATCH OUT!! The ordering matters - specialized searchers must go first, since the file always
         // handles the pattern, and prevents the following ones from running.

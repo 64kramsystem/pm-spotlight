@@ -1,5 +1,5 @@
 use fltk::{
-    app::{self, set_focus, App, Receiver, Sender},
+    app::{self, is_event_shift, set_focus, App, Receiver, Sender},
     browser::HoldBrowser,
     enums::{CallbackTrigger, Event, Key},
     group::Pack,
@@ -88,8 +88,8 @@ impl PMSpotlightApp {
                     FocusOnBrowser => {
                         self.message_event_focus_on_browser();
                     }
-                    ExecuteEntry => {
-                        self.message_event_execute_entry();
+                    ExecuteEntry(alternate) => {
+                        self.message_event_execute_entry(alternate);
                     }
                 }
             }
@@ -119,7 +119,7 @@ impl PMSpotlightApp {
     ) {
         input.handle(move |_input, event| {
             if event == Event::KeyDown && app::event_key() == Key::Enter {
-                sender.send(ExecuteEntry);
+                sender.send(ExecuteEntry(is_event_shift()));
                 return true;
             } else if event == Event::KeyDown && app::event_key() == Key::Down {
                 sender.send(FocusOnBrowser);
@@ -138,7 +138,7 @@ impl PMSpotlightApp {
         //
         browser.handle(move |_browser, event| {
             if event == Event::KeyDown && app::event_key() == Key::Enter {
-                sender.send(ExecuteEntry);
+                sender.send(ExecuteEntry(is_event_shift()));
                 return true;
             }
 
@@ -180,7 +180,7 @@ impl PMSpotlightApp {
         }
     }
 
-    fn message_event_execute_entry(&mut self) {
+    fn message_event_execute_entry(&mut self, alternate: bool) {
         let selected_line = if self.browser.value() > 0 {
             self.browser.value()
         } else if self.browser.size() > 0 {
@@ -192,8 +192,17 @@ impl PMSpotlightApp {
         let entry: SearchResultEntry = unsafe { self.browser.data(selected_line) }.unwrap();
 
         if self.current_search_id == entry.search_id {
-            self.search_manager
-                .execute(entry.value.unwrap_or(entry.label));
+            let entry_value = entry.value.unwrap_or(entry.label);
+
+            if alternate {
+                let alt_executed = self.search_manager.alt_execute(entry_value);
+
+                if !alt_executed {
+                    return;
+                }
+            } else {
+                self.search_manager.execute(entry_value);
+            }
 
             self.input.set_value("");
             set_focus(&self.input);
