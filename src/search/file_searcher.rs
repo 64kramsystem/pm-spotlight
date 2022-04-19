@@ -12,6 +12,7 @@ use crate::{
 };
 
 const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_./]";
+const MIN_CHARS: usize = 2;
 
 pub struct FileSearcher {
     search_paths: Vec<(String, usize)>,
@@ -46,9 +47,9 @@ impl FileSearcher {
     fn process_search_path_definition(mut path: &str) -> (String, usize) {
         let mut depth = 255;
 
-        let re = Regex::new(r"(.+)\{(\d)\}$").unwrap();
+        let re_path_with_depth = Regex::new(r"(.+)\{(\d)\}$").unwrap();
 
-        if let Some(captures) = re.captures(path) {
+        if let Some(captures) = re_path_with_depth.captures(path) {
             path = captures.get(1).unwrap().as_str();
             depth = captures.get(2).unwrap().as_str().parse().unwrap();
         }
@@ -135,9 +136,9 @@ impl FileSearcher {
 
 impl Searcher for FileSearcher {
     fn handles(&self, pattern: &str) -> bool {
-        let re = Regex::new(DISALLOWED_PATH_CHARS).unwrap();
+        let re_disallowed_chars = Regex::new(DISALLOWED_PATH_CHARS).unwrap();
 
-        if re.is_match(pattern) {
+        if re_disallowed_chars.is_match(pattern) {
             panic!("Only alphanum and *_-./ are allowed");
         } else {
             true
@@ -145,7 +146,7 @@ impl Searcher for FileSearcher {
     }
 
     fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32) {
-        if pattern.chars().collect::<Vec<_>>().len() < 2 {
+        if pattern.chars().collect::<Vec<_>>().len() < MIN_CHARS {
             return;
         }
 
