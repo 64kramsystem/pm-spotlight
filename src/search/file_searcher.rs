@@ -1,4 +1,4 @@
-use std::{os::unix::prelude::CommandExt, path::Path, process::Command};
+use std::{fs, os::unix::prelude::CommandExt, path::Path, process::Command};
 
 use fltk::app::Sender;
 use regex::Regex;
@@ -8,7 +8,7 @@ use super::{search_result_entry::SearchResultEntry, searcher::Searcher};
 use crate::{
     config::config_manager::Config,
     gui::message_event::MessageEvent::{self, UpdateList},
-    helpers::filenames::map_filenames_to_short_names,
+    helpers::{clipboard_management::copy_to_clipboard, filenames::map_filenames_to_short_names},
 };
 
 const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_./]";
@@ -197,5 +197,17 @@ impl Searcher for FileSearcher {
         // this is currently fine.
         //
         Command::new("xdg-open").args([filename]).exec();
+    }
+
+    fn alt_execute(&self, filename: String) -> bool {
+        let canonical_path = fs::canonicalize(filename)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        copy_to_clipboard(canonical_path);
+
+        true
     }
 }

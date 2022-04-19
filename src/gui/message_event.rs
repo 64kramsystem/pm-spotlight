@@ -4,5 +4,6 @@ pub enum MessageEvent {
     StartSearch(String),
     UpdateList(Vec<SearchResultEntry>),
     FocusOnBrowser,
-    ExecuteEntry,
+    // False: normal; true: alternate
+    ExecuteEntry(bool),
 }
