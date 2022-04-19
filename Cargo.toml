@@ -3,6 +3,9 @@ edition = "2021"
 name = "pm-spotlight"
 version = "0.1.0"
 
+[profile.release]
+strip = true
+
 [dependencies]
 # Unreleased fltk-rs (v1.3.5) includes Browser data support, and fixes SharedImage::from_image
 dirs = "4.0.0"
