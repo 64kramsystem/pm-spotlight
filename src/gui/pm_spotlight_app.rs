@@ -55,6 +55,7 @@ impl PMSpotlightApp {
         Self::fltk_event_execute_entry_from_browser(&mut browser, sender.clone());
 
         pack.end();
+        window.make_resizable(true);
         window.end();
         window.show();
 
