@@ -15,7 +15,7 @@ const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_./]";
 
 pub struct FileSearcher {
     search_paths: Vec<(String, usize)>,
-    skip_paths: Vec<(String, bool)>,
+    skip_paths: Vec<Regex>,
     stop_search: bool,
 }
 
@@ -65,63 +65,53 @@ impl FileSearcher {
         }
     }
 
-    // Returns (filename, is_basename)
+    // Everything is converted to an absolute path, that must match in full (wildcards are allowed).
+    // Skip paths that match at any level, simply are prefixed with '/*/'.
+    // Regexes are defined as case-insensitive.
     //
-    fn process_skip_path_definition(path: &str) -> (String, bool) {
-        if path.starts_with("*/") {
-            (path.chars().skip(2).collect::<String>(), true)
-        } else if path.starts_with("/") {
-            (path.to_string(), false)
-        } else {
-            (
-                dirs::home_dir()
-                    .unwrap()
-                    .join(path)
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-                false,
-            )
+    fn process_skip_path_definition(path: &str) -> Regex {
+        let mut path = path.to_string();
+
+        // Handle home prefix
+        //
+        if !path.starts_with('/') {
+            path = dirs::home_dir()
+                .unwrap()
+                .join(path)
+                .to_str()
+                .unwrap()
+                .to_string();
         }
+
+        // Handle wildcards.
+        //
+        let mut regex = path.replace('.', r"\.").replace('*', ".*");
+
+        // Handle full-match and case-sensitivenes
+        //
+        regex = format!("(?i)^{}$", regex);
+
+        Regex::new(&regex).unwrap()
     }
 
     // Skip entry format: (filename, is_basename).
     //
     fn skip_entry(&self, entry: &DirEntry) -> bool {
-        let basename = if let Some(filename) = entry.file_name().to_str() {
-            filename.to_lowercase()
+        let fullname = if let Some(fullname) = entry.path().to_str() {
+            fullname.to_string()
         } else {
-            return false;
+            return true;
         };
 
-        let fullname = if let Some(filename) = entry.path().to_str() {
-            filename.to_lowercase()
-        } else {
-            return false;
-        };
+        let is_hidden_re = Regex::new(r"/\.[^/]+$").unwrap();
 
-        let is_hidden = basename.starts_with(".");
-
-        if is_hidden {
+        if is_hidden_re.is_match(&fullname) {
             return true;
         }
 
-        let match_by_basename = self
-            .skip_paths
+        self.skip_paths
             .iter()
-            .any(|(skip_path, is_basename)| *is_basename && &basename == skip_path);
-
-        if match_by_basename {
-            return true;
-        }
-
-        let dir_match_by_fullname = entry.file_type().is_dir()
-            && self
-                .skip_paths
-                .iter()
-                .any(|(skip_path, is_basename)| !is_basename && &fullname == skip_path);
-
-        dir_match_by_fullname
+            .any(|skip_re| skip_re.is_match(&fullname))
     }
 
     fn include_entry(entry: &DirEntry, pattern: &str) -> Option<String> {
