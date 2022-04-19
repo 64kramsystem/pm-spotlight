@@ -8,7 +8,7 @@ version = "0.1.0"
 dirs = "4.0.0"
 fltk = {git = "https://github.com/fltk-rs/fltk-rs", rev = "a0402da3d160f55a5d41b1a8daec3d7a41f58fbc"}
 phf = {version = "0.10.1", features = ["macros"]}
-# regex = "1.5.5"
+regex = "1.5.5"
 serde = {version = "1.0.136", features = ["derive"]}
 toml = "0.5.9"
 walkdir = "2.3.2"
