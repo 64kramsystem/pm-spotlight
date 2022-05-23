@@ -1,5 +1,6 @@
 use crate::search::search_result_entry::SearchResultEntry;
 
+#[derive(Clone)]
 pub enum MessageEvent {
     StartSearch(String),
     UpdateList(Vec<SearchResultEntry>),
