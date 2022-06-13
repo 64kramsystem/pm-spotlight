@@ -11,6 +11,12 @@ use crate::{
     helpers::clipboard_management::copy_to_clipboard,
 };
 
+// This is the Google set, from Emojipedia.
+//
+// Conversion command:
+//
+//     convert emoji_icons.source/robot.png -resize 30x30 emoji_icons/robot.png
+//
 const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "👍" => ("+1, thumbs up",                                           include_bytes!("../../resources/emoji_icons/thumbs_up.png")),
     "👎" => ("-1, thumbs down",                                         include_bytes!("../../resources/emoji_icons/thumbs_down.png")),
@@ -92,6 +98,7 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "👸" => ("princess",                                                include_bytes!("../../resources/emoji_icons/princess.png")),
     "☺" => ("! relaxed",                                                include_bytes!("../../resources/emoji_icons/relaxed.png")),
     "😌" => ("relieved",                                                include_bytes!("../../resources/emoji_icons/relieved.png")),
+    "🤖" => ("robot",                                                   include_bytes!("../../resources/emoji_icons/robot.png")),
     "🤣" => ("rolling_on_the_floor, rotfl",                             include_bytes!("../../resources/emoji_icons/rotfl.png")),
     "🙁" => ("slightly_frowning, sad",                                  include_bytes!("../../resources/emoji_icons/frowning.png")),
     "😱" => ("screaming",                                               include_bytes!("../../resources/emoji_icons/screaming.png")),
