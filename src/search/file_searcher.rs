@@ -11,7 +11,7 @@ use crate::{
     helpers::{clipboard_management::copy_to_clipboard, filenames::map_filenames_to_short_names},
 };
 
-const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_. /]";
+const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_. /']";
 const MIN_CHARS: usize = 2;
 
 pub struct FileSearcher {
