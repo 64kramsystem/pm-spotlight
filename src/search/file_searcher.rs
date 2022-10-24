@@ -182,7 +182,9 @@ impl Searcher for FileSearcher {
 
         let processed_result = filename_labels
             .into_iter()
-            .map(|(label, fullname)| SearchResultEntry::new(None, label, Some(fullname), search_id))
+            .map(|(label, fullname)| {
+                SearchResultEntry::new(None, label, Some(fullname), search_id, true)
+            })
             .collect();
 
         sender.send(UpdateList(processed_result));

@@ -167,6 +167,7 @@ impl Searcher for EmojiSearcher {
                             patterns.to_string(),
                             Some(emoji.to_string()),
                             search_id,
+                            true,
                         ))
                     } else {
                         None
