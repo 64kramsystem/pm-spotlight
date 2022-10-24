@@ -12,6 +12,8 @@ pub struct SearchResultEntry {
     // searches clear the current browser list. However, this assumption introduces a dependency. By
     // storing the search id here, we don't need to care about how the app behaves.
     pub search_id: u32,
+    // Invalid entries are not executed; they are used to convey messages to the user.
+    pub valid: bool,
 }
 
 impl SearchResultEntry {
@@ -20,12 +22,14 @@ impl SearchResultEntry {
         label: String,
         value: Option<String>,
         search_id: u32,
+        valid: bool,
     ) -> Self {
         Self {
             icon,
             label,
             value,
             search_id,
+            valid,
         }
     }
 }

@@ -191,7 +191,7 @@ impl PMSpotlightApp {
 
         let entry: SearchResultEntry = unsafe { self.browser.data(selected_line) }.unwrap();
 
-        if self.current_search_id == entry.search_id {
+        if self.current_search_id == entry.search_id && entry.valid {
             let entry_value = entry.value.unwrap_or(entry.label);
 
             if alternate {
