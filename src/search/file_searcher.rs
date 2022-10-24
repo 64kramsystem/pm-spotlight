@@ -129,17 +129,26 @@ impl FileSearcher {
 }
 
 impl Searcher for FileSearcher {
-    fn handles(&self, pattern: &str) -> bool {
-        let re_disallowed_chars = Regex::new(DISALLOWED_PATH_CHARS).unwrap();
-
-        if re_disallowed_chars.is_match(pattern) {
-            panic!("Only alphanum and *_-./ are allowed");
-        } else {
-            true
-        }
+    fn handles(&self, _pattern: &str) -> bool {
+        true
     }
 
     fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32) {
+        let re_disallowed_chars = Regex::new(DISALLOWED_PATH_CHARS).unwrap();
+
+        if re_disallowed_chars.is_match(&pattern) {
+            let processed_result = vec![SearchResultEntry::new(
+                None,
+                "Only alphanum and *_-./ are allowed".into(),
+                None,
+                search_id,
+                false,
+            )];
+
+            sender.send(UpdateList(processed_result));
+            return;
+        }
+
         if pattern.chars().count() < MIN_CHARS {
             return;
         }
