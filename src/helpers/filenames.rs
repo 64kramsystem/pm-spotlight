@@ -38,7 +38,7 @@ pub fn map_filenames_to_short_names(filenames: Vec<String>) -> HashMap<String, S
             } else {
                 for parent in &parents {
                     let new_parent = parent.parent().unwrap();
-                    let super_dir = parent.strip_prefix(&new_parent).unwrap();
+                    let super_dir = parent.strip_prefix(new_parent).unwrap();
                     let new_shortname = Path::new(super_dir).join(&shortname);
 
                     let current_parents = working_set.entry(new_shortname).or_insert_with(Vec::new);

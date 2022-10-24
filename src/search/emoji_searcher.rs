@@ -148,13 +148,13 @@ impl EmojiSearcher {
 
 impl Searcher for EmojiSearcher {
     fn handles(&self, pattern: &str) -> bool {
-        pattern.starts_with(":")
+        pattern.starts_with(':')
     }
 
     fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32) {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
-        if pattern.len() > 0 {
+        if !pattern.is_empty() {
             let search_result = EMOJI_ICON_PATTERNS
                 .into_iter()
                 .filter_map(|(emoji, (patterns, image_bytes))| {
