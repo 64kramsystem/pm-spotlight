@@ -136,6 +136,8 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "🤪" => ("zany_face, o_O",                                          include_bytes!("../../resources/emoji_icons/zany.png")),
     "🤐" => ("zipper_mouth",                                            include_bytes!("../../resources/emoji_icons/zipper_mouth.png")),
     "🧟" => ("zombie",                                                  include_bytes!("../../resources/emoji_icons/zombie.png")),
+    // Symbols
+    "↵" => ("enter",                                                   include_bytes!("../../resources/emoji_icons/enter.png")),
 };
 
 pub struct EmojiSearcher {}
