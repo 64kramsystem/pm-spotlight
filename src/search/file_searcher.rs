@@ -172,9 +172,13 @@ impl Searcher for FileSearcher {
             // We can't filter out+in in a single pass, because if we filter out a directory, WalkDir will
             // stop recursing.
             //
-            walker
-                .into_iter()
-                .filter_map(|e| Self::include_entry(&e.unwrap(), &re_pattern))
+            walker.into_iter().filter_map(|entry| match entry {
+                Ok(entry) => Self::include_entry(&entry, &re_pattern),
+                Err(error) => {
+                    eprintln!("{:?}", error);
+                    None
+                }
+            })
         };
 
         // Ignore nonexisting search paths; a legitimate use case is, for example, a shared config
