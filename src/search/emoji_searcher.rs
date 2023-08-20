@@ -37,6 +37,7 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "😊" => ("blush",                                                   include_bytes!("../../resources/emoji_icons/blush.png")),
     "💐" => ("bouquet, flowers",                                        include_bytes!("../../resources/emoji_icons/bouquet.png")),
     "🍑" => ("butt, ass",                                               include_bytes!("../../resources/emoji_icons/butt.png")),
+    "🤌" => ("cazzuvo",                                                 include_bytes!("../../resources/emoji_icons/cazzuvo.png")), // from char
     "🧒" => ("child",                                                   include_bytes!("../../resources/emoji_icons/child.png")),
     "👦" => ("boy, child",                                              include_bytes!("../../resources/emoji_icons/boy.png")),
     "👧" => ("girl, child",                                             include_bytes!("../../resources/emoji_icons/girl.png")),
