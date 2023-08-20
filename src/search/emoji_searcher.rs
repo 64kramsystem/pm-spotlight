@@ -11,11 +11,17 @@ use crate::{
     helpers::clipboard_management::copy_to_clipboard,
 };
 
-// This is the Google set, from Emojipedia.
+// This is the Google set, from Emojipedia, except where specified.
 //
 // Conversion command:
 //
 //     convert emoji_icons.source/robot.png -resize 30x30 emoji_icons/robot.png
+//
+// It's possible to create a png from a character via `pango-view`:
+//
+//     echo -e "🤌" |
+//       pango-view --dpi=300 --no-display --font='Droid Sans Mono' --output=emoji_source.png /dev/stdin &&
+//       convert emoji_source.png -resize 30x30 emoji_resized.png
 //
 const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "👍" => ("+1, thumbs up",                                           include_bytes!("../../resources/emoji_icons/thumbs_up.png")),
@@ -31,6 +37,8 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "😊" => ("blush",                                                   include_bytes!("../../resources/emoji_icons/blush.png")),
     "💐" => ("bouquet, flowers",                                        include_bytes!("../../resources/emoji_icons/bouquet.png")),
     "🍑" => ("butt, ass",                                               include_bytes!("../../resources/emoji_icons/butt.png")),
+    "🤙" => ("call_me",                                                 include_bytes!("../../resources/emoji_icons/call_me.png")), // from char
+    "🤌" => ("cazzuvo",                                                 include_bytes!("../../resources/emoji_icons/cazzuvo.png")), // from char
     "🧒" => ("child",                                                   include_bytes!("../../resources/emoji_icons/child.png")),
     "👦" => ("boy, child",                                              include_bytes!("../../resources/emoji_icons/boy.png")),
     "👧" => ("girl, child",                                             include_bytes!("../../resources/emoji_icons/girl.png")),
