@@ -77,6 +77,7 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "😈" => ("happy_devil, evil",                                       include_bytes!("../../resources/emoji_icons/happy_devil.png")),
     "❤️" => ("heart",                                                   include_bytes!("../../resources/emoji_icons/heart.png")),
     "😍" => ("heart_eyes",                                              include_bytes!("../../resources/emoji_icons/heart_eyes.png")),
+    "👩‍❤️‍👨" => ("heart_woman_man",                                         include_bytes!("../../resources/emoji_icons/heart_woman_man.png")), // from char
     "🥵" => ("hot_face, heat",                                          include_bytes!("../../resources/emoji_icons/hot_face.png")),
     "🤗" => ("greeting_hands",                                          include_bytes!("../../resources/emoji_icons/greeting_hands.png")),
     "😯" => ("hushed, surprised, confused",                             include_bytes!("../../resources/emoji_icons/hushed.png")),
