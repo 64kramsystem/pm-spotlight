@@ -88,6 +88,7 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "😭" => ("loudly_crying_face, crying river",                        include_bytes!("../../resources/emoji_icons/crying_loudly.png")),
     "👨" => ("man",                                                     include_bytes!("../../resources/emoji_icons/man.png")),
     "🕺" => ("man_dancing, man dancer",                                 include_bytes!("../../resources/emoji_icons/dancing_man.png")),
+    "🥹" => ("moved_eyes, holding_tears",                               include_bytes!("../../resources/emoji_icons/holding_tears.png")), // from char
     "🖕" => ("middle_finger",                                           include_bytes!("../../resources/emoji_icons/middle_finger.png")),
     "🤑" => ("money_mouth_face",                                        include_bytes!("../../resources/emoji_icons/money_face.png")),
     "🤢" => ("nauseated_face,throwing_up",                              include_bytes!("../../resources/emoji_icons/nauseated_face.png")),
