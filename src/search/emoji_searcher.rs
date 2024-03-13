@@ -81,6 +81,7 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "🤗" => ("greeting_hands",                                          include_bytes!("../../resources/emoji_icons/greeting_hands.png")),
     "😯" => ("hushed, surprised, confused",                             include_bytes!("../../resources/emoji_icons/hushed.png")),
     "⛸️" => ("ice_skate",                                               include_bytes!("../../resources/emoji_icons/ice_skate.png")),
+    "👩‍❤️‍💋‍👨" => ("kiss_woman_man",                                          include_bytes!("../../resources/emoji_icons/kiss_woman_man.png")), // from char
     "😆" => ("laughing",                                                include_bytes!("../../resources/emoji_icons/laughing.png")),
     "😂" => ("laughing (joy)",                                          include_bytes!("../../resources/emoji_icons/laughing_joy.png")),
     "🤭" => ("laughing_with_hand",                                      include_bytes!("../../resources/emoji_icons/laughing_hand.png")),
