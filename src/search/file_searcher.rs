@@ -11,7 +11,8 @@ use crate::{
     helpers::{clipboard_management::copy_to_clipboard, filenames::map_filenames_to_short_names},
 };
 
-const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_. /']";
+const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_. /&']";
+const DISALLOWED_CHARS_MESSAGE: &str = "Only alphanum and `*_-. /&` are allowed";
 const MIN_CHARS: usize = 2;
 
 pub struct FileSearcher {
@@ -139,7 +140,7 @@ impl Searcher for FileSearcher {
         if re_disallowed_chars.is_match(&pattern) {
             let processed_result = vec![SearchResultEntry::new(
                 None,
-                "Only alphanum and *_-./ are allowed".into(),
+                DISALLOWED_CHARS_MESSAGE.into(),
                 None,
                 search_id,
                 false,
