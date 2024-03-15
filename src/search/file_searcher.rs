@@ -12,7 +12,7 @@ use crate::{
 };
 
 const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_. /&']";
-const DISALLOWED_CHARS_MESSAGE: &str = "Only alphanum and *_-./& are allowed";
+const DISALLOWED_CHARS_MESSAGE: &str = "Only alphanum and `*_-. /&` are allowed";
 const MIN_CHARS: usize = 2;
 
 pub struct FileSearcher {
