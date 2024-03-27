@@ -11,19 +11,19 @@ use crate::{
     helpers::clipboard_management::copy_to_clipboard,
 };
 
-// This is the Google set, from Emojipedia, except where specified.
+// This is the Google set, from Emojipedia, except where specified ("from char").
 //
-// Conversion command:
+// Some emojis have been unnecessarily generated from a character, but there's not value in regenerating them.
 //
-//     convert emoji_icons.source/robot.png -resize 30x30 emoji_icons/robot.png
+// Conversion commands:
 //
-// It's possible to create a png from a character via `pango-view`:
-//
-//     echo -e "🤌" |
-//       pango-view --dpi=300 --no-display --font='Droid Sans Mono' --output=emoji_source.png /dev/stdin &&
-//       convert emoji_source.png -resize 30x30 emoji_resized.png
+//     ICON_NAME=enter
+//     # This is only for generating images from characters
+//     echo -e "↵" | pango-view --dpi=300 --no-display --font='Droid Sans Mono' --output=emoji_icons.source/$ICON_NAME.png /dev/stdin
+//     convert emoji_icons.source/$ICON_NAME.png -resize 30x30 emoji_icons/$ICON_NAME.png
 //
 const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
+    // Emojis (symbols are at the bottom)
     "👍" => ("+1, thumbs up",                                           include_bytes!("../../resources/emoji_icons/thumbs_up.png")),
     "👎" => ("-1, thumbs down",                                         include_bytes!("../../resources/emoji_icons/thumbs_down.png")),
     "😠" => ("angry",                                                   include_bytes!("../../resources/emoji_icons/angry.png")),
