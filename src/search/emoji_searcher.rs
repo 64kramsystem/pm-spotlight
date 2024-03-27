@@ -34,6 +34,7 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "🦲" => ("bald",                                                    include_bytes!("../../resources/emoji_icons/bald.png")),
     "😁" => ("beaming_face_with_smiling_eyes, grin",                    include_bytes!("../../resources/emoji_icons/beaming.png")),
     "🎂" => ("birthday_cake",                                           include_bytes!("../../resources/emoji_icons/birthday_cake.png")),
+    "😘" => ("blowing_kiss",                                            include_bytes!("../../resources/emoji_icons/blowing_kiss.png")),
     "😊" => ("blush",                                                   include_bytes!("../../resources/emoji_icons/blush.png")),
     "💐" => ("bouquet, flowers",                                        include_bytes!("../../resources/emoji_icons/bouquet.png")),
     "👦" => ("boy, child",                                              include_bytes!("../../resources/emoji_icons/boy.png")),
