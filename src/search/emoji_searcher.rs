@@ -11,7 +11,9 @@ use crate::{
     helpers::clipboard_management::copy_to_clipboard,
 };
 
-// This is the Google set, from Emojipedia, except where specified.
+// This is the Google set, from Emojipedia, except where specified ("from char").
+//
+// Some emojis have been unnecessarily generated from a character, but there's not value in regenerating them.
 //
 // Conversion command:
 //
