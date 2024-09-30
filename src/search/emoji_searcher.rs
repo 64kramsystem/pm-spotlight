@@ -147,7 +147,7 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "🥴" => ("woozy, zany",                                             include_bytes!("../../resources/emoji_icons/woozy.png")),
     "🫡" => ("yessir, saluting_face",                                   include_bytes!("../../resources/emoji_icons/saluting_face.png")),
     "😋" => ("yum, food, hungry, slurp, full belly",                    include_bytes!("../../resources/emoji_icons/yummy.png")),
-    "🤪" => ("zany_face, o_O",                                          include_bytes!("../../resources/emoji_icons/zany.png")),
+    "🤪" => ("zany_face, wacky, o_O",                                   include_bytes!("../../resources/emoji_icons/zany.png")),
     "🤐" => ("zipper_mouth",                                            include_bytes!("../../resources/emoji_icons/zipper_mouth.png")),
     "🧟" => ("zombie",                                                  include_bytes!("../../resources/emoji_icons/zombie.png")),
     // Symbols
