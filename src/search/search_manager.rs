@@ -2,7 +2,10 @@ use fltk::app::Sender;
 
 use crate::{config::config_manager::Config, gui::message_event::MessageEvent};
 
-use super::{emoji_searcher::EmojiSearcher, file_searcher::FileSearcher, searcher::Searcher};
+use super::emoji_searcher::EmojiSearcher;
+#[cfg(target_os = "linux")]
+use super::file_searcher::FileSearcher;
+use super::searcher::Searcher;
 
 pub struct SearchManager {
     config: Config,
@@ -62,6 +65,7 @@ impl SearchManager {
         //
         let searchers: Vec<Box<dyn Searcher>> = vec![
             Box::new(EmojiSearcher::new()),
+            #[cfg(target_os = "linux")]
             Box::new(FileSearcher::new(self.config.clone())),
         ];
 
