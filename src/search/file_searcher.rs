@@ -224,6 +224,6 @@ impl Searcher for FileSearcher {
 
         copy_to_clipboard(canonical_path);
 
-        true
+        std::process::exit(0);
     }
 }
