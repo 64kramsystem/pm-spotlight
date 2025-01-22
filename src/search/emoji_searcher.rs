@@ -11,9 +11,12 @@ use crate::{
     helpers::clipboard_management::copy_to_clipboard,
 };
 
-// This is the Google set, from Emojipedia, except where specified ("from char").
+// The reference for the Emoji is Emojipedia.
 //
-// Some emojis have been unnecessarily generated from a character, but there's not value in regenerating them.
+// The emoji characters (hash keys) are Emojipedia reference image; the images seem to have been extracted
+// from different sets.
+//
+// Some emojis have been unnecessarily generated from a character, but there's no value in regenerating them.
 //
 // Conversion commands:
 //
