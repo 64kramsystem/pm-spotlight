@@ -212,7 +212,7 @@ impl Searcher for FileSearcher {
         //
         // this is currently fine.
         //
-        Command::new("xdg-open").args([filename]).exec();
+        let _ = Command::new("xdg-open").args([filename]).exec();
     }
 
     fn alt_execute(&self, filename: String) -> bool {
