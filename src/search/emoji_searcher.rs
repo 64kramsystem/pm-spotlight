@@ -1,7 +1,4 @@
-use fltk::{
-    app::Sender,
-    image::{PngImage, SharedImage},
-};
+use fltk::{app::Sender, image::PngImage};
 use phf::phf_map;
 use std::process;
 
@@ -182,11 +179,8 @@ impl Searcher for EmojiSearcher {
                 .into_iter()
                 .filter_map(|(emoji, (patterns, image_bytes))| {
                     if patterns.contains(&pattern) {
-                        let shared_image =
-                            SharedImage::from_image(PngImage::from_data(image_bytes).unwrap());
-
                         Some(SearchResultEntry::new(
-                            shared_image.ok(),
+                            PngImage::from_data(image_bytes).ok(),
                             patterns.to_string(),
                             Some(emoji.to_string()),
                             search_id,
