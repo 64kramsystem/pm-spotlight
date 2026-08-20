@@ -29,6 +29,9 @@ pub struct PMSpotlightApp {
     sender: Sender<MessageEvent>,
     receiver: Receiver<MessageEvent>,
     browser: HoldBrowser,
+    // Row n maps to entries[n - 1], and browser rows borrow their icons from entries.
+    // Clear the browser before entries so each icon outlives its row.
+    entries: Vec<SearchResultEntry>,
     input: Input,
 }
 
@@ -50,9 +53,9 @@ impl PMSpotlightApp {
         browser.set_text_size(BROWSER_TEXT_SIZE);
         input.set_trigger(CallbackTrigger::Changed);
 
-        Self::callback_start_search(&mut input, sender.clone());
-        Self::fltk_event_list_execute_entry_and_focus_on_browser(&mut input, sender.clone());
-        Self::fltk_event_execute_entry_from_browser(&mut browser, sender.clone());
+        Self::callback_start_search(&mut input, sender);
+        Self::fltk_event_list_execute_entry_and_focus_on_browser(&mut input, sender);
+        Self::fltk_event_execute_entry_from_browser(&mut browser, sender);
 
         pack.end();
         window.make_resizable(true);
@@ -66,6 +69,7 @@ impl PMSpotlightApp {
             sender,
             receiver,
             browser,
+            entries: Vec::new(),
             input,
         }
     }
@@ -152,7 +156,8 @@ impl PMSpotlightApp {
 
     fn message_event_start_search(&mut self, pattern: String) {
         self.browser.clear();
-        self.current_search_id = self.search_manager.search(pattern, self.sender.clone());
+        self.entries.clear();
+        self.current_search_id = self.search_manager.search(pattern, self.sender);
     }
 
     fn message_event_update_list(&mut self, entries: Vec<SearchResultEntry>) {
@@ -160,15 +165,11 @@ impl PMSpotlightApp {
             // Can check here or only on the single entry; doesn't matter.
             //
             if self.current_search_id == entry.search_id {
-                // This is wasteful, but the browser wants to own the data. We could keep in #data just
-                // the data strictly needed to perform the execute action, but it's an optimization that
-                // doesn't matter, at least now.
-                //
-                let label = entry.label.clone();
                 let icon = entry.icon.clone();
 
-                self.browser.add_with_data(&label, entry);
+                self.browser.add(&entry.label);
                 self.browser.set_icon(self.browser.size(), icon);
+                self.entries.push(entry);
             }
         }
     }
@@ -189,7 +190,9 @@ impl PMSpotlightApp {
             return;
         };
 
-        let entry: SearchResultEntry = unsafe { self.browser.data(selected_line) }.unwrap();
+        let Some(entry) = self.entries.get((selected_line - 1) as usize).cloned() else {
+            return;
+        };
 
         if self.current_search_id == entry.search_id && entry.valid {
             let entry_value = entry.value.unwrap_or(entry.label);
@@ -207,6 +210,7 @@ impl PMSpotlightApp {
             self.input.set_value("");
             set_focus(&self.input);
             self.browser.clear();
+            self.entries.clear();
         }
     }
 }
