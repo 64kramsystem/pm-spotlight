@@ -1,5 +1,3 @@
-#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
-
 mod gui {
     pub mod message_event;
     pub mod pm_spotlight_app;
@@ -7,7 +5,6 @@ mod gui {
 
 mod search {
     pub mod emoji_searcher;
-    #[cfg(target_os = "linux")]
     pub mod file_searcher;
     pub mod search_manager;
     pub mod search_result_entry;

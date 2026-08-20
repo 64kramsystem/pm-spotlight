@@ -1,6 +1,6 @@
 # Poor Man's Spotlight
 
-PMsS is a minimal desktop search service, designed to run with multiple backends, currently:
+PMsS is a minimal Linux desktop search service, designed to run with multiple backends, currently:
 
 - configurable filesystem search
 - emoji search
