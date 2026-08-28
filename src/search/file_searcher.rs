@@ -1,17 +1,19 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
-use fltk::app::Sender;
 use regex::Regex;
 use walkdir::{DirEntry, WalkDir};
 
-use super::{search_result_entry::SearchResultEntry, searcher::Searcher};
+use super::{
+    search_result_entry::SearchResultEntry,
+    searcher::{ExecutionAction, SearchResultSink, Searcher},
+};
 use crate::{
     config::config_manager::Config,
-    gui::message_event::MessageEvent::{self, UpdateList},
-    helpers::{
-        clipboard_management::copy_to_clipboard, file_execution::open_path,
-        filenames::map_filenames_to_short_names,
-    },
+    helpers::{desktop_integration::DesktopIntegration, filenames::map_filenames_to_short_names},
 };
 
 const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_. /&']";
@@ -19,6 +21,7 @@ const DISALLOWED_CHARS_MESSAGE: &str = "Only alphanum and `*_-. /&` are allowed"
 const MIN_CHARS: usize = 2;
 
 pub struct FileSearcher {
+    desktop: Arc<dyn DesktopIntegration>,
     search_paths: Vec<(String, usize)>,
     skip_paths: Vec<Regex>,
     stop_search: bool,
@@ -27,20 +30,29 @@ pub struct FileSearcher {
 }
 
 impl FileSearcher {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config, desktop: Arc<dyn DesktopIntegration>) -> Self {
+        Self::with_home(config, desktop, dirs::home_dir().unwrap())
+    }
+
+    pub fn with_home(
+        config: Config,
+        desktop: Arc<dyn DesktopIntegration>,
+        home_dir: PathBuf,
+    ) -> Self {
         let search_paths = config
             .search_paths
             .into_iter()
-            .map(|path| Self::process_search_path_definition(&path))
+            .map(|path| Self::process_search_path_definition(&path, &home_dir))
             .collect::<Vec<_>>();
 
         let skip_paths = config
             .skip_paths
             .iter()
-            .map(|path| Self::process_skip_path_definition(path))
+            .map(|path| Self::process_skip_path_definition(path, &home_dir))
             .collect::<Vec<_>>();
 
         Self {
+            desktop,
             search_paths,
             skip_paths,
             stop_search: false,
@@ -48,7 +60,7 @@ impl FileSearcher {
         }
     }
 
-    fn process_search_path_definition(mut path: &str) -> (String, usize) {
+    fn process_search_path_definition(mut path: &str, home_dir: &Path) -> (String, usize) {
         let mut depth = 255;
 
         let re_path_with_depth = Regex::new(r"(.+)\{(\d)\}$").unwrap();
@@ -61,15 +73,7 @@ impl FileSearcher {
         if path.starts_with('/') {
             (path.to_string(), depth)
         } else {
-            (
-                dirs::home_dir()
-                    .unwrap()
-                    .join(path)
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-                depth,
-            )
+            (home_dir.join(path).to_str().unwrap().to_string(), depth)
         }
     }
 
@@ -77,18 +81,13 @@ impl FileSearcher {
     // Skip paths that match at any level, simply are prefixed with '/*/'.
     // Regexes are defined as case-insensitive.
     //
-    fn process_skip_path_definition(path: &str) -> Regex {
+    fn process_skip_path_definition(path: &str, home_dir: &Path) -> Regex {
         let mut path = path.to_string();
 
         // Handle home prefix
         //
         if !path.starts_with('/') {
-            path = dirs::home_dir()
-                .unwrap()
-                .join(path)
-                .to_str()
-                .unwrap()
-                .to_string();
+            path = home_dir.join(path).to_str().unwrap().to_string();
         }
 
         // Handle wildcards.
@@ -137,7 +136,7 @@ impl Searcher for FileSearcher {
         true
     }
 
-    fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32) {
+    fn search(&mut self, pattern: String, sink: Arc<dyn SearchResultSink>, search_id: u32) {
         let re_disallowed_chars = Regex::new(DISALLOWED_PATH_CHARS).unwrap();
 
         if re_disallowed_chars.is_match(&pattern) {
@@ -149,7 +148,7 @@ impl Searcher for FileSearcher {
                 false,
             )];
 
-            sender.send(UpdateList(processed_result));
+            sink.send(processed_result);
             return;
         }
 
@@ -204,25 +203,27 @@ impl Searcher for FileSearcher {
             })
             .collect();
 
-        sender.send(UpdateList(processed_result));
+        sink.send(processed_result);
     }
 
-    fn execute(&self, filename: String) -> Result<(), String> {
-        open_path(Path::new(&filename))
+    fn execute(&self, filename: String) -> Result<ExecutionAction, String> {
+        self.desktop
+            .open_path(Path::new(&filename))
             .map_err(|error| format!("Could not open {filename:?}: {error}"))?;
-        std::process::exit(0);
+        Ok(ExecutionAction::ExitApplication)
     }
 
-    fn alt_execute(&self, filename: String) -> Result<bool, String> {
+    fn alt_execute(&self, filename: String) -> Result<ExecutionAction, String> {
         let canonical_path = fs::canonicalize(&filename)
             .map_err(|error| format!("Could not resolve {filename:?}: {error}"))?
             .to_str()
             .ok_or_else(|| format!("Path is not valid UTF-8: {filename:?}"))?
             .to_string();
 
-        copy_to_clipboard(canonical_path)
+        self.desktop
+            .copy_text(canonical_path)
             .map_err(|error| format!("Could not copy the path for {filename:?}: {error}"))?;
 
-        std::process::exit(0);
+        Ok(ExecutionAction::ExitApplication)
     }
 }

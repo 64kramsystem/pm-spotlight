@@ -1,12 +1,12 @@
-use fltk::{app::Sender, image::PngImage};
+use fltk::image::PngImage;
 use phf::phf_map;
-use std::process;
+use std::sync::Arc;
 
-use super::{search_result_entry::SearchResultEntry, searcher::Searcher};
-use crate::{
-    gui::message_event::MessageEvent::{self, UpdateList},
-    helpers::clipboard_management::copy_to_clipboard,
+use super::{
+    search_result_entry::SearchResultEntry,
+    searcher::{ExecutionAction, SearchResultSink, Searcher},
 };
+use crate::helpers::desktop_integration::DesktopIntegration;
 
 // The reference for the Emoji is Emojipedia.
 //
@@ -158,11 +158,13 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "↵" => ("enter",                                                   include_bytes!("../../resources/emoji_icons/enter.png")),
 };
 
-pub struct EmojiSearcher {}
+pub struct EmojiSearcher {
+    desktop: Arc<dyn DesktopIntegration>,
+}
 
 impl EmojiSearcher {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(desktop: Arc<dyn DesktopIntegration>) -> Self {
+        Self { desktop }
     }
 }
 
@@ -171,7 +173,7 @@ impl Searcher for EmojiSearcher {
         pattern.starts_with(':')
     }
 
-    fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32) {
+    fn search(&mut self, pattern: String, sink: Arc<dyn SearchResultSink>, search_id: u32) {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if !pattern.is_empty() {
@@ -192,12 +194,14 @@ impl Searcher for EmojiSearcher {
                 })
                 .collect();
 
-            sender.send(UpdateList(search_result));
+            sink.send(search_result);
         }
     }
 
-    fn execute(&self, emoji: String) -> Result<(), String> {
-        copy_to_clipboard(emoji).map_err(|error| format!("Could not copy emoji: {error}"))?;
-        process::exit(0);
+    fn execute(&self, emoji: String) -> Result<ExecutionAction, String> {
+        self.desktop
+            .copy_text(emoji)
+            .map_err(|error| format!("Could not copy emoji: {error}"))?;
+        Ok(ExecutionAction::ExitApplication)
     }
 }

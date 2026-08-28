@@ -1,4 +1,6 @@
-use crate::search::search_result_entry::SearchResultEntry;
+use fltk::app::Sender;
+
+use crate::search::{search_result_entry::SearchResultEntry, searcher::SearchResultSink};
 
 #[derive(Clone)]
 pub enum MessageEvent {
@@ -7,4 +9,10 @@ pub enum MessageEvent {
     FocusOnBrowser,
     // False: normal; true: alternate
     ExecuteEntry(bool),
+}
+
+impl SearchResultSink for Sender<MessageEvent> {
+    fn send(&self, entries: Vec<SearchResultEntry>) {
+        Sender::send(self, MessageEvent::UpdateList(entries));
+    }
 }

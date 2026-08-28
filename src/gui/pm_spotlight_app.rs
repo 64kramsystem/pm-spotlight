@@ -9,8 +9,12 @@ use fltk::{
     prelude::*,
     window::Window,
 };
+use std::sync::Arc;
 
-use crate::search::{search_manager::SearchManager, search_result_entry::SearchResultEntry};
+use crate::search::{
+    search_manager::SearchManager, search_result_entry::SearchResultEntry,
+    searcher::ExecutionAction,
+};
 
 use super::message_event::MessageEvent::{self, *};
 
@@ -33,7 +37,7 @@ pub struct PMSpotlightApp {
     // Row n maps to entries[n - 1], and browser rows borrow their icons from entries.
     // Clear the browser before entries so each icon outlives its row.
     entries: Vec<SearchResultEntry>,
-    input: Input,
+    _input: Input,
 }
 
 impl PMSpotlightApp {
@@ -71,7 +75,7 @@ impl PMSpotlightApp {
             receiver,
             browser,
             entries: Vec::new(),
-            input,
+            _input: input,
         }
     }
 
@@ -158,7 +162,7 @@ impl PMSpotlightApp {
     fn message_event_start_search(&mut self, pattern: String) {
         self.browser.clear();
         self.entries.clear();
-        self.current_search_id = self.search_manager.search(pattern, self.sender);
+        self.current_search_id = self.search_manager.search(pattern, Arc::new(self.sender));
     }
 
     fn message_event_update_list(&mut self, entries: Vec<SearchResultEntry>) {
@@ -199,26 +203,20 @@ impl PMSpotlightApp {
             let entry_value = entry.value.unwrap_or(entry.label);
 
             let execution_result = if alternate {
-                match self.search_manager.alt_execute(entry_value) {
-                    Ok(true) => Ok(()),
-                    Ok(false) => return,
-                    Err(error) => Err(error),
-                }
+                self.search_manager.alt_execute(entry_value)
             } else {
                 self.search_manager.execute(entry_value)
             };
 
-            if let Err(error) = execution_result {
-                dialog::alert_default(&format!(
-                    "Poor Man's Spotlight could not execute the selected entry:\n\n{error}"
-                ));
-                return;
+            match execution_result {
+                Ok(ExecutionAction::ExitApplication) => std::process::exit(0),
+                Ok(ExecutionAction::Ignore) => {}
+                Err(error) => {
+                    dialog::alert_default(&format!(
+                        "Poor Man's Spotlight could not execute the selected entry:\n\n{error}"
+                    ));
+                }
             }
-
-            self.input.set_value("");
-            set_focus(&self.input);
-            self.browser.clear();
-            self.entries.clear();
         }
     }
 }

@@ -1,6 +1,16 @@
-use fltk::app::Sender;
+use std::sync::Arc;
 
-use crate::gui::message_event::MessageEvent;
+use super::search_result_entry::SearchResultEntry;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExecutionAction {
+    ExitApplication,
+    Ignore,
+}
+
+pub trait SearchResultSink: Send + Sync {
+    fn send(&self, entries: Vec<SearchResultEntry>);
+}
 
 pub trait Searcher {
     fn handles(&self, pattern: &str) -> bool;
@@ -11,15 +21,14 @@ pub trait Searcher {
     // Can run in a separate thread or not, but in the latter case, the search **must** be so fast that
     // it's immediate from a user perspective.
     //
-    fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32);
+    fn search(&mut self, pattern: String, sink: Arc<dyn SearchResultSink>, search_id: u32);
 
-    fn execute(&self, value: String) -> Result<(), String>;
+    fn execute(&self, value: String) -> Result<ExecutionAction, String>;
 
     // Alternate execute mode, activated by Shift+Enter; optional.
-    // Returns true if supported; false otherwise.
     //
-    fn alt_execute(&self, _value: String) -> Result<bool, String> {
-        Ok(false)
+    fn alt_execute(&self, _value: String) -> Result<ExecutionAction, String> {
+        Ok(ExecutionAction::Ignore)
     }
 
     // Implemented only when there is a separate thread.
