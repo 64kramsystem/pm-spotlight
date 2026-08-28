@@ -56,7 +56,7 @@ pub fn copy_to_clipboard(text: String) -> Result<(), String> {
             let _ = server.wait();
         }
 
-        return result;
+        result
     }
 
     #[cfg(not(target_os = "linux"))]
