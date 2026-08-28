@@ -28,8 +28,14 @@ use std::process::ExitCode;
 
 fn main() -> ExitCode {
     #[cfg(target_os = "linux")]
-    if helpers::clipboard_management::run_clipboard_server_if_requested() {
-        return ExitCode::SUCCESS;
+    if let Some(result) = helpers::clipboard_management::run_clipboard_server_if_requested() {
+        return match result {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("Clipboard server failed: {error}");
+                ExitCode::FAILURE
+            }
+        };
     }
 
     let config = match ConfigManager::load_configuration() {

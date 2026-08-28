@@ -1,6 +1,7 @@
 use fltk::{
     app::{self, is_event_shift, set_focus, App, Receiver, Sender},
     browser::HoldBrowser,
+    dialog,
     enums::{CallbackTrigger, Event, Key},
     group::Pack,
     image::PngImage,
@@ -197,14 +198,21 @@ impl PMSpotlightApp {
         if self.current_search_id == entry.search_id && entry.valid {
             let entry_value = entry.value.unwrap_or(entry.label);
 
-            if alternate {
-                let alt_executed = self.search_manager.alt_execute(entry_value);
-
-                if !alt_executed {
-                    return;
+            let execution_result = if alternate {
+                match self.search_manager.alt_execute(entry_value) {
+                    Ok(true) => Ok(()),
+                    Ok(false) => return,
+                    Err(error) => Err(error),
                 }
             } else {
-                self.search_manager.execute(entry_value);
+                self.search_manager.execute(entry_value)
+            };
+
+            if let Err(error) = execution_result {
+                dialog::alert_default(&format!(
+                    "Poor Man's Spotlight could not execute the selected entry:\n\n{error}"
+                ));
+                return;
             }
 
             self.input.set_value("");

@@ -13,13 +13,13 @@ pub trait Searcher {
     //
     fn search(&mut self, pattern: String, sender: Sender<MessageEvent>, search_id: u32);
 
-    fn execute(&self, value: String);
+    fn execute(&self, value: String) -> Result<(), String>;
 
     // Alternate execute mode, activated by Shift+Enter; optional.
     // Returns true if supported; false otherwise.
     //
-    fn alt_execute(&self, _value: String) -> bool {
-        false
+    fn alt_execute(&self, _value: String) -> Result<bool, String> {
+        Ok(false)
     }
 
     // Implemented only when there is a separate thread.

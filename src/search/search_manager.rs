@@ -42,17 +42,19 @@ impl SearchManager {
         self.current_search_id
     }
 
-    pub fn execute(&mut self, value: String) {
+    pub fn execute(&mut self, value: String) -> Result<(), String> {
         if let Some(searcher) = &mut self.current_searcher {
             searcher.execute(value)
+        } else {
+            Ok(())
         }
     }
 
-    pub fn alt_execute(&mut self, value: String) -> bool {
+    pub fn alt_execute(&mut self, value: String) -> Result<bool, String> {
         if let Some(searcher) = &mut self.current_searcher {
             searcher.alt_execute(value)
         } else {
-            false
+            Ok(false)
         }
     }
 

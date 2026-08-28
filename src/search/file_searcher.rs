@@ -207,20 +207,21 @@ impl Searcher for FileSearcher {
         sender.send(UpdateList(processed_result));
     }
 
-    fn execute(&self, filename: String) {
-        if open_path(Path::new(&filename)).is_ok() {
-            std::process::exit(0);
-        }
+    fn execute(&self, filename: String) -> Result<(), String> {
+        open_path(Path::new(&filename))
+            .map_err(|error| format!("Could not open {filename:?}: {error}"))?;
+        std::process::exit(0);
     }
 
-    fn alt_execute(&self, filename: String) -> bool {
-        let canonical_path = fs::canonicalize(filename)
-            .unwrap()
+    fn alt_execute(&self, filename: String) -> Result<bool, String> {
+        let canonical_path = fs::canonicalize(&filename)
+            .map_err(|error| format!("Could not resolve {filename:?}: {error}"))?
             .to_str()
-            .unwrap()
+            .ok_or_else(|| format!("Path is not valid UTF-8: {filename:?}"))?
             .to_string();
 
-        copy_to_clipboard(canonical_path);
+        copy_to_clipboard(canonical_path)
+            .map_err(|error| format!("Could not copy the path for {filename:?}: {error}"))?;
 
         std::process::exit(0);
     }

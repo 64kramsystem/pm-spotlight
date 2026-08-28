@@ -196,8 +196,8 @@ impl Searcher for EmojiSearcher {
         }
     }
 
-    fn execute(&self, emoji: String) {
-        copy_to_clipboard(emoji);
+    fn execute(&self, emoji: String) -> Result<(), String> {
+        copy_to_clipboard(emoji).map_err(|error| format!("Could not copy emoji: {error}"))?;
         process::exit(0);
     }
 }
