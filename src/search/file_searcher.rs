@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs,
     panic::{catch_unwind, AssertUnwindSafe},
     path::{Path, PathBuf},
@@ -146,7 +147,7 @@ impl FileSearcher {
         re_pattern: &Regex,
         cancellation: &AtomicBool,
     ) -> Option<Vec<String>> {
-        let mut matching_fullnames = Vec::new();
+        let mut matching_fullnames = HashSet::new();
 
         // Ignore nonexisting search paths; a legitimate use case is, for example, a shared config
         // across multiple machines.
@@ -179,7 +180,7 @@ impl FileSearcher {
                 match entry {
                     Ok(entry) => {
                         if let Some(fullname) = Self::include_entry(&entry, re_pattern) {
-                            matching_fullnames.push(fullname);
+                            matching_fullnames.insert(fullname);
                         }
                     }
                     Err(error) => eprintln!("{error:?}"),
@@ -187,7 +188,7 @@ impl FileSearcher {
             }
         }
 
-        Some(matching_fullnames)
+        Some(matching_fullnames.into_iter().collect())
     }
 
     fn cancel_active_search(&mut self) {

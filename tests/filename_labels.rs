@@ -47,3 +47,16 @@ fn labels_expand_through_multiple_shared_parent_names() {
         ])
     );
 }
+
+#[test]
+fn duplicate_full_paths_are_collapsed() {
+    let labels = map_filenames_to_short_names(vec![
+        "/one/report.txt".to_string(),
+        "/one/report.txt".to_string(),
+    ]);
+
+    assert_eq!(
+        labels,
+        HashMap::from([("report.txt".to_string(), "/one/report.txt".to_string())])
+    );
+}

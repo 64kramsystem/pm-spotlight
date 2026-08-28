@@ -306,13 +306,13 @@ fn filesystem_search_returns_before_results_are_delivered() {
 }
 
 #[test]
-fn filesystem_worker_failures_are_reported_as_invalid_results() {
+fn overlapping_search_roots_return_each_file_once() {
     let home = TempDirectory::new();
-    home.create_file("documents/target.txt");
+    let target = home.create_file("documents/nested/target.txt");
 
     let sink = Arc::new(CollectingSink::default());
     let mut manager = SearchManager::with_dependencies(
-        config(&["documents", "documents"], &[]),
+        config(&["documents", "documents/nested"], &[]),
         Arc::new(RecordingDesktop::default()),
         home.path.clone(),
     );
@@ -323,8 +323,6 @@ fn filesystem_worker_failures_are_reported_as_invalid_results() {
     assert_eq!(batches.len(), 1);
     assert_eq!(batches[0].len(), 1);
     assert_eq!(batches[0][0].search_id, search_id);
-    assert!(!batches[0][0].valid);
-    assert!(batches[0][0]
-        .label
-        .contains("Filesystem search failed unexpectedly"));
+    assert!(batches[0][0].valid);
+    assert_eq!(batches[0][0].value.as_deref(), target.to_str());
 }

@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 
 // Map full filenames to unique short names, adding parents where required:
 //
@@ -6,6 +9,8 @@ use std::{collections::HashMap, path::Path};
 //
 //
 pub fn map_filenames_to_short_names(filenames: Vec<String>) -> HashMap<String, String> {
+    let filenames = filenames.into_iter().collect::<HashSet<_>>();
+
     // Working set format: short name -> parent
     //
     let mut working_set = HashMap::new();
