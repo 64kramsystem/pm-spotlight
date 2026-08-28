@@ -171,6 +171,43 @@ fn emoji_search_routes_execution_to_the_clipboard() {
 }
 
 #[test]
+fn execution_without_an_active_search_is_ignored() {
+    let home = TempDirectory::new();
+    let mut manager = search_manager(
+        config(&[], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    assert_eq!(
+        manager.execute("anything".to_string()).unwrap(),
+        ExecutionAction::Ignore
+    );
+    assert_eq!(
+        manager.alt_execute("anything".to_string()).unwrap(),
+        ExecutionAction::Ignore
+    );
+}
+
+#[test]
+fn emoji_clipboard_failures_are_returned_and_alternate_execution_is_ignored() {
+    let home = TempDirectory::new();
+    let desktop = Arc::new(RecordingDesktop::default());
+    *desktop.copy_error.lock().unwrap() = Some("clipboard unavailable".to_string());
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(config(&[], &[]), desktop, home.path.clone());
+    manager.search(":".to_string(), sink);
+
+    let error = manager.execute("👍".to_string()).unwrap_err();
+    assert!(error.contains("Could not copy emoji"));
+    assert!(error.contains("clipboard unavailable"));
+    assert_eq!(
+        manager.alt_execute("👍".to_string()).unwrap(),
+        ExecutionAction::Ignore
+    );
+}
+
+#[test]
 fn file_search_honors_home_depth_hidden_and_skip_rules() {
     let home = TempDirectory::new();
     let visible = home.create_file("documents/visible_target.txt");
@@ -207,6 +244,99 @@ fn file_search_honors_home_depth_hidden_and_skip_rules() {
     ];
     expected.sort();
     assert_eq!(values, expected);
+}
+
+#[test]
+fn file_search_is_case_insensitive_and_supports_wildcards() {
+    let home = TempDirectory::new();
+    let alpha = home.create_file("documents/Alpha-report.TXT");
+    let alphabet = home.create_file("documents/alphabet.txt");
+    home.create_file("documents/beta.txt");
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(&["documents"], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("ALPHA*TXT".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    let mut values = batches[0]
+        .iter()
+        .map(|entry| entry.value.clone().unwrap())
+        .collect::<Vec<_>>();
+    values.sort();
+    let mut expected = vec![
+        alpha.to_str().unwrap().to_string(),
+        alphabet.to_str().unwrap().to_string(),
+    ];
+    expected.sort();
+    assert_eq!(values, expected);
+}
+
+#[test]
+fn periods_in_file_queries_are_matched_literally() {
+    let home = TempDirectory::new();
+    let expected = home.create_file("documents/report.txt");
+    home.create_file("documents/reportXtxt");
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(&["documents"], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("report.txt".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    assert_eq!(batches[0].len(), 1);
+    assert_eq!(batches[0][0].value.as_deref(), expected.to_str());
+}
+
+#[test]
+fn absolute_and_missing_search_roots_are_handled() {
+    let home = TempDirectory::new();
+    let expected = home.create_file("absolute/target.txt");
+    let absolute_root = home.path.join("absolute");
+    let missing_root = home.path.join("not-mounted");
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(
+            &[
+                absolute_root.to_str().unwrap(),
+                missing_root.to_str().unwrap(),
+            ],
+            &[],
+        ),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("target".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    assert_eq!(batches[0].len(), 1);
+    assert_eq!(batches[0][0].value.as_deref(), expected.to_str());
+}
+
+#[test]
+fn hidden_directories_are_not_traversed() {
+    let home = TempDirectory::new();
+    home.create_file("documents/.private/hidden_target.txt");
+    let expected = home.create_file("documents/public/visible_target.txt");
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(&["documents"], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("target".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    assert_eq!(batches[0].len(), 1);
+    assert_eq!(batches[0][0].value.as_deref(), expected.to_str());
 }
 
 #[test]
@@ -249,6 +379,19 @@ fn file_execution_uses_the_desktop_integration_and_reports_failures() {
         .unwrap_err();
     assert!(error.contains("Could not open"));
     assert!(error.contains("desktop unavailable"));
+
+    *desktop.copy_error.lock().unwrap() = Some("clipboard unavailable".to_string());
+    let error = manager
+        .alt_execute(file.to_str().unwrap().to_string())
+        .unwrap_err();
+    assert!(error.contains("Could not copy the path"));
+    assert!(error.contains("clipboard unavailable"));
+
+    let missing = home.path.join("missing.txt");
+    let error = manager
+        .alt_execute(missing.to_str().unwrap().to_string())
+        .unwrap_err();
+    assert!(error.contains("Could not resolve"));
 }
 
 #[test]
@@ -352,6 +495,51 @@ fn skip_paths_treat_regex_metacharacters_as_literals() {
     assert_eq!(batches.len(), 1);
     assert_eq!(batches[0].len(), 1);
     assert_eq!(batches[0][0].value.as_deref(), visible.to_str());
+}
+
+#[test]
+fn skip_paths_are_case_insensitive_and_expand_wildcards() {
+    let home = TempDirectory::new();
+    home.create_file("Documents/Archive-2025/skipped_target.txt");
+    let visible = home.create_file("Documents/current/visible_target.txt");
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(&["Documents"], &["documents/archive-*"]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("target".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    assert_eq!(batches[0].len(), 1);
+    assert_eq!(batches[0][0].value.as_deref(), visible.to_str());
+}
+
+#[cfg(unix)]
+#[test]
+fn directory_symlinks_are_not_followed() {
+    use std::os::unix::fs::symlink;
+
+    let home = TempDirectory::new();
+    home.create_file("outside/target.txt");
+    fs::create_dir_all(home.path.join("documents")).unwrap();
+    symlink(
+        home.path.join("outside"),
+        home.path.join("documents/linked-directory"),
+    )
+    .unwrap();
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(&["documents"], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("target".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    assert!(batches[0].is_empty());
 }
 
 #[cfg(target_os = "linux")]

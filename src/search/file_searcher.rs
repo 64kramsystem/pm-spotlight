@@ -33,9 +33,32 @@ struct FileSearchPlan {
     re_is_hidden: Regex,
 }
 
+trait FileMatchFinder: Send + Sync {
+    fn find_matches(
+        &self,
+        plan: &FileSearchPlan,
+        re_pattern: &Regex,
+        cancellation: &AtomicBool,
+    ) -> Option<Vec<String>>;
+}
+
+struct WalkDirMatchFinder;
+
+impl FileMatchFinder for WalkDirMatchFinder {
+    fn find_matches(
+        &self,
+        plan: &FileSearchPlan,
+        re_pattern: &Regex,
+        cancellation: &AtomicBool,
+    ) -> Option<Vec<String>> {
+        FileSearcher::find_matches(plan, re_pattern, cancellation)
+    }
+}
+
 pub struct FileSearcher {
     desktop: Arc<dyn DesktopIntegration>,
     plan: Arc<FileSearchPlan>,
+    match_finder: Arc<dyn FileMatchFinder>,
     cancellation: Option<Arc<AtomicBool>>,
 }
 
@@ -70,6 +93,7 @@ impl FileSearcher {
                 skip_paths,
                 re_is_hidden: Regex::new(r"/\.[^/]+$").unwrap(),
             }),
+            match_finder: Arc::new(WalkDirMatchFinder),
             cancellation: None,
         })
     }
@@ -78,6 +102,7 @@ impl FileSearcher {
         Self {
             desktop: Arc::clone(&self.desktop),
             plan: Arc::clone(&self.plan),
+            match_finder: Arc::clone(&self.match_finder),
             cancellation: None,
         }
     }
@@ -258,6 +283,7 @@ impl Searcher for FileSearcher {
             }
         };
         let plan = Arc::clone(&self.plan);
+        let match_finder = Arc::clone(&self.match_finder);
         let cancellation = Arc::new(AtomicBool::new(false));
         self.cancellation = Some(Arc::clone(&cancellation));
         let worker_sink = Arc::clone(&sink);
@@ -266,7 +292,8 @@ impl Searcher for FileSearcher {
             .name(format!("file-search-{search_id}"))
             .spawn(move || {
                 let search_result = catch_unwind(AssertUnwindSafe(|| {
-                    let matching_fullnames = Self::find_matches(&plan, &re_pattern, &cancellation)?;
+                    let matching_fullnames =
+                        match_finder.find_matches(&plan, &re_pattern, &cancellation)?;
 
                     let filename_labels = map_filenames_to_short_names(matching_fullnames);
 
@@ -343,5 +370,228 @@ impl Searcher for FileSearcher {
 
     fn stop(&mut self) {
         self.cancel_active_search();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        path::Path,
+        sync::{mpsc, Condvar, Mutex},
+        time::Duration,
+    };
+
+    use super::*;
+
+    struct NoopDesktop;
+
+    impl DesktopIntegration for NoopDesktop {
+        fn copy_text(&self, _text: String) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn open_path(&self, _path: &Path) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    struct RecordingSink {
+        batches: Mutex<Vec<Vec<SearchResultEntry>>>,
+        received: Condvar,
+    }
+
+    impl RecordingSink {
+        fn wait_for_batch(&self) -> Vec<SearchResultEntry> {
+            let batches = self.batches.lock().unwrap();
+            let (batches, timeout) = self
+                .received
+                .wait_timeout_while(batches, Duration::from_secs(2), |batches| {
+                    batches.is_empty()
+                })
+                .unwrap();
+            assert!(!timeout.timed_out(), "timed out waiting for worker result");
+            batches[0].clone()
+        }
+    }
+
+    impl SearchResultSink for RecordingSink {
+        fn send(&self, entries: Vec<SearchResultEntry>) {
+            self.batches.lock().unwrap().push(entries);
+            self.received.notify_all();
+        }
+    }
+
+    struct BlockingFinder {
+        started: mpsc::Sender<()>,
+        release: Mutex<mpsc::Receiver<()>>,
+        finished: mpsc::Sender<()>,
+    }
+
+    impl FileMatchFinder for BlockingFinder {
+        fn find_matches(
+            &self,
+            _plan: &FileSearchPlan,
+            _re_pattern: &Regex,
+            cancellation: &AtomicBool,
+        ) -> Option<Vec<String>> {
+            self.started.send(()).unwrap();
+            self.release.lock().unwrap().recv().unwrap();
+            let result = (!cancellation.load(Ordering::Acquire)).then(Vec::new);
+            self.finished.send(()).unwrap();
+            result
+        }
+    }
+
+    struct PanickingFinder;
+
+    impl FileMatchFinder for PanickingFinder {
+        fn find_matches(
+            &self,
+            _plan: &FileSearchPlan,
+            _re_pattern: &Regex,
+            _cancellation: &AtomicBool,
+        ) -> Option<Vec<String>> {
+            panic!("simulated traversal failure")
+        }
+    }
+
+    fn config(search_paths: &[&str], skip_paths: &[&str]) -> Config {
+        Config {
+            search_paths: search_paths
+                .iter()
+                .map(|path| (*path).to_string())
+                .collect(),
+            skip_paths: skip_paths.iter().map(|path| (*path).to_string()).collect(),
+        }
+    }
+
+    fn searcher(home: &Path) -> FileSearcher {
+        FileSearcher::with_home(
+            config(&["documents{3}"], &[]),
+            Arc::new(NoopDesktop),
+            home.to_path_buf(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn search_path_definitions_expand_home_and_optional_depth() {
+        let home = Path::new("/home/tester");
+
+        assert_eq!(
+            FileSearcher::process_search_path_definition("Documents{4}", home),
+            (PathBuf::from("/home/tester/Documents"), 4)
+        );
+        assert_eq!(
+            FileSearcher::process_search_path_definition("Documents", home),
+            (PathBuf::from("/home/tester/Documents"), 255)
+        );
+        assert_eq!(
+            FileSearcher::process_search_path_definition("/shared{2}", home),
+            (PathBuf::from("/shared"), 2)
+        );
+    }
+
+    #[test]
+    fn wildcard_conversion_escapes_all_regex_syntax_except_asterisks() {
+        let converted = FileSearcher::wildcard_regex("[archive]+*.txt");
+        let regex = Regex::new(&format!("^{converted}$")).unwrap();
+
+        assert!(regex.is_match("[archive]+-old.txt"));
+        assert!(!regex.is_match("archive-oldXtxt"));
+    }
+
+    #[test]
+    fn compiled_skip_paths_are_anchored_case_insensitive_globs() {
+        let regex = FileSearcher::process_skip_path_definition(
+            "Documents/Archive-*",
+            Path::new("/home/tester"),
+        )
+        .unwrap();
+
+        assert!(regex.is_match("/HOME/TESTER/documents/archive-2026"));
+        assert!(regex.is_match("/home/tester/documents/archive-2026/file.txt"));
+        assert!(!regex.is_match("/other/documents/archive-2026"));
+    }
+
+    #[test]
+    fn stopping_a_search_sets_and_releases_its_cancellation_token() {
+        let mut searcher = searcher(Path::new("/home/tester"));
+        let cancellation = Arc::new(AtomicBool::new(false));
+        searcher.cancellation = Some(Arc::clone(&cancellation));
+
+        searcher.stop();
+
+        assert!(cancellation.load(Ordering::Acquire));
+        assert!(searcher.cancellation.is_none());
+    }
+
+    #[test]
+    fn traversal_honors_cancellation_before_accessing_search_roots() {
+        let searcher = FileSearcher::with_home(
+            config(&["/"], &[]),
+            Arc::new(NoopDesktop),
+            PathBuf::from("/unused"),
+        )
+        .unwrap();
+        let cancellation = AtomicBool::new(true);
+        let pattern = Regex::new("target").unwrap();
+
+        assert!(FileSearcher::find_matches(&searcher.plan, &pattern, &cancellation).is_none());
+    }
+
+    #[test]
+    fn a_new_searcher_shares_the_plan_but_has_independent_cancellation() {
+        let mut template = searcher(Path::new("/home/tester"));
+        let template_cancellation = Arc::new(AtomicBool::new(false));
+        template.cancellation = Some(template_cancellation);
+
+        let search = template.new_search();
+
+        assert!(Arc::ptr_eq(&template.plan, &search.plan));
+        assert!(search.cancellation.is_none());
+        assert!(search.handles("any valid file query"));
+    }
+
+    #[test]
+    fn stop_cancels_an_in_flight_worker_before_it_can_deliver_results() {
+        let (started_tx, started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let (finished_tx, finished_rx) = mpsc::channel();
+        let mut searcher = searcher(Path::new("/home/tester"));
+        searcher.match_finder = Arc::new(BlockingFinder {
+            started: started_tx,
+            release: Mutex::new(release_rx),
+            finished: finished_tx,
+        });
+        let sink = Arc::new(RecordingSink::default());
+
+        searcher.search("target".to_string(), sink.clone(), 12);
+        started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        searcher.stop();
+        release_tx.send(()).unwrap();
+        finished_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+
+        assert!(sink.batches.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn worker_panics_are_converted_to_non_executable_results() {
+        let mut searcher = searcher(Path::new("/home/tester"));
+        searcher.match_finder = Arc::new(PanickingFinder);
+        let sink = Arc::new(RecordingSink::default());
+
+        searcher.search("target".to_string(), sink.clone(), 42);
+
+        let batch = sink.wait_for_batch();
+        assert_eq!(batch.len(), 1);
+        assert_eq!(batch[0].search_id, 42);
+        assert!(!batch[0].valid);
+        assert_eq!(batch[0].value, None);
+        assert!(batch[0]
+            .label
+            .contains("Filesystem search failed unexpectedly"));
+        assert!(batch[0].label.contains("simulated traversal failure"));
     }
 }

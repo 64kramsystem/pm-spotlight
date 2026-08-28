@@ -34,3 +34,17 @@ pub fn open_path(path: &Path) -> Result<(), String> {
         Err(format!("no application can open {path}"))
     }
 }
+
+#[cfg(all(test, target_os = "macos"))]
+mod macos_tests {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt, path::PathBuf};
+
+    use super::*;
+
+    #[test]
+    fn non_utf8_paths_are_reported_before_calling_nsworkspace() {
+        let path = PathBuf::from(OsString::from_vec(b"/tmp/invalid-\xff".to_vec()));
+
+        assert_eq!(open_path(&path).unwrap_err(), "path is not valid UTF-8");
+    }
+}
