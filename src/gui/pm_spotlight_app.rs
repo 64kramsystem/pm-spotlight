@@ -11,12 +11,18 @@ use fltk::{
 };
 use std::sync::Arc;
 
-use crate::search::{
-    search_manager::SearchManager, search_result_entry::SearchResultEntry,
-    searcher::ExecutionAction,
+use crate::{
+    application::controller::AppController,
+    search::{
+        search_manager::SearchManager, search_result_entry::SearchResultEntry,
+        searcher::ExecutionAction,
+    },
 };
 
-use super::message_event::MessageEvent::{self, *};
+use super::{
+    message_event::MessageEvent::{self, *},
+    selection::selected_entry_index,
+};
 
 const WINDOW_TITLE: &str = "Poor Man's Spotlight!";
 
@@ -28,8 +34,7 @@ const WINDOW_ICON: &[u8] = include_bytes!("../../resources/window_icon/telescope
 const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
 
 pub struct PMSpotlightApp {
-    search_manager: SearchManager,
-    current_search_id: u32,
+    controller: AppController,
     app: App,
     sender: Sender<MessageEvent>,
     receiver: Receiver<MessageEvent>,
@@ -68,8 +73,7 @@ impl PMSpotlightApp {
         window.show();
 
         Self {
-            search_manager,
-            current_search_id: 0,
+            controller: AppController::new(search_manager),
             app,
             sender,
             receiver,
@@ -162,20 +166,16 @@ impl PMSpotlightApp {
     fn message_event_start_search(&mut self, pattern: String) {
         self.browser.clear();
         self.entries.clear();
-        self.current_search_id = self.search_manager.search(pattern, Arc::new(self.sender));
+        self.controller.start_search(pattern, Arc::new(self.sender));
     }
 
     fn message_event_update_list(&mut self, entries: Vec<SearchResultEntry>) {
-        for entry in entries {
-            // Can check here or only on the single entry; doesn't matter.
-            //
-            if self.current_search_id == entry.search_id {
-                let icon = entry.icon.clone();
+        for entry in self.controller.filter_current_entries(entries) {
+            let icon = entry.icon.clone();
 
-                self.browser.add(&entry.label);
-                self.browser.set_icon(self.browser.size(), icon);
-                self.entries.push(entry);
-            }
+            self.browser.add(&entry.label);
+            self.browser.set_icon(self.browser.size(), icon);
+            self.entries.push(entry);
         }
     }
 
@@ -187,35 +187,22 @@ impl PMSpotlightApp {
     }
 
     fn message_event_execute_entry(&mut self, alternate: bool) {
-        let selected_line = if self.browser.value() > 0 {
-            self.browser.value()
-        } else if self.browser.size() > 0 {
-            1
-        } else {
+        let Some(selected_index) = selected_entry_index(self.browser.value(), self.browser.size())
+        else {
             return;
         };
 
-        let Some(entry) = self.entries.get((selected_line - 1) as usize).cloned() else {
+        let Some(entry) = self.entries.get(selected_index).cloned() else {
             return;
         };
 
-        if self.current_search_id == entry.search_id && entry.valid {
-            let entry_value = entry.value.unwrap_or(entry.label);
-
-            let execution_result = if alternate {
-                self.search_manager.alt_execute(entry_value)
-            } else {
-                self.search_manager.execute(entry_value)
-            };
-
-            match execution_result {
-                Ok(ExecutionAction::ExitApplication) => std::process::exit(0),
-                Ok(ExecutionAction::Ignore) => {}
-                Err(error) => {
-                    dialog::alert_default(&format!(
-                        "Poor Man's Spotlight could not execute the selected entry:\n\n{error}"
-                    ));
-                }
+        match self.controller.execute_entry(&entry, alternate) {
+            Ok(ExecutionAction::ExitApplication) => std::process::exit(0),
+            Ok(ExecutionAction::Ignore) => {}
+            Err(error) => {
+                dialog::alert_default(&format!(
+                    "Poor Man's Spotlight could not execute the selected entry:\n\n{error}"
+                ));
             }
         }
     }

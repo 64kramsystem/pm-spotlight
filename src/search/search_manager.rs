@@ -99,3 +99,84 @@ impl SearchManager {
             .find(|searcher| searcher.handles(pattern))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        path::Path,
+        sync::atomic::{AtomicBool, Ordering},
+    };
+
+    use crate::search::search_result_entry::SearchResultEntry;
+
+    use super::*;
+
+    struct NoopDesktop;
+
+    impl DesktopIntegration for NoopDesktop {
+        fn copy_text(&self, _text: String) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn open_path(&self, _path: &Path) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    struct NullSink;
+
+    impl SearchResultSink for NullSink {
+        fn send(&self, _entries: Vec<SearchResultEntry>) {}
+    }
+
+    struct StopRecordingSearcher {
+        stopped: Arc<AtomicBool>,
+    }
+
+    impl Searcher for StopRecordingSearcher {
+        fn handles(&self, _pattern: &str) -> bool {
+            true
+        }
+
+        fn search(&mut self, _pattern: String, _sink: Arc<dyn SearchResultSink>, _search_id: u32) {}
+
+        fn execute(&self, _value: String) -> Result<ExecutionAction, String> {
+            Ok(ExecutionAction::Ignore)
+        }
+
+        fn stop(&mut self) {
+            self.stopped.store(true, Ordering::Release);
+        }
+    }
+
+    #[test]
+    fn starting_a_new_search_stops_the_previous_searcher() {
+        let mut manager = SearchManager::with_dependencies(
+            Config {
+                search_paths: Vec::new(),
+                skip_paths: Vec::new(),
+            },
+            Arc::new(NoopDesktop),
+            PathBuf::from("/unused"),
+        )
+        .unwrap();
+        let stopped = Arc::new(AtomicBool::new(false));
+        manager.current_searcher = Some(Box::new(StopRecordingSearcher {
+            stopped: Arc::clone(&stopped),
+        }));
+
+        manager.search("x".to_string(), Arc::new(NullSink));
+
+        assert!(stopped.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn native_manager_construction_does_not_require_desktop_access() {
+        let manager = SearchManager::new(Config {
+            search_paths: Vec::new(),
+            skip_paths: Vec::new(),
+        });
+
+        assert!(manager.is_ok());
+    }
+}

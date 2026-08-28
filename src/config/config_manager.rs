@@ -1,11 +1,11 @@
-use std::fs;
+use std::{fs, path::Path};
 
 use serde::Deserialize;
 
 const CONFIG_BASENAME: &str = ".pm-spotlight";
 const DEFAULT_CONFIG: &str = "search_paths = []\nskip_paths = []\n";
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct Config {
     pub search_paths: Vec<String>,
     pub skip_paths: Vec<String>,
@@ -15,9 +15,14 @@ pub struct ConfigManager {}
 
 impl ConfigManager {
     pub fn load_configuration() -> Result<Config, String> {
-        let config_filename = dirs::home_dir()
-            .ok_or_else(|| "Could not determine the home directory".to_string())?
-            .join(CONFIG_BASENAME);
+        let home_dir =
+            dirs::home_dir().ok_or_else(|| "Could not determine the home directory".to_string())?;
+
+        Self::load_configuration_from(&home_dir)
+    }
+
+    pub fn load_configuration_from(home_dir: &Path) -> Result<Config, String> {
+        let config_filename = home_dir.join(CONFIG_BASENAME);
 
         let config_str = match fs::read_to_string(&config_filename) {
             Ok(config_str) => config_str,

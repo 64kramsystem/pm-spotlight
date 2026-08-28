@@ -158,6 +158,36 @@ const EMOJI_ICON_PATTERNS: phf::Map<&str, (&str, &[u8])> = phf_map! {
     "↵" => ("enter",                                                   include_bytes!("../../resources/emoji_icons/enter.png")),
 };
 
+fn matching_emojis(pattern: &str) -> Vec<(&'static str, &'static str, &'static [u8])> {
+    EMOJI_ICON_PATTERNS
+        .entries()
+        .filter_map(|(emoji, (patterns, image_bytes))| {
+            patterns
+                .contains(pattern)
+                .then_some((*emoji, *patterns, *image_bytes))
+        })
+        .collect()
+}
+
+fn matching_emoji_entries(
+    pattern: &str,
+    search_id: u32,
+    mut load_icon: impl FnMut(&[u8]) -> Option<PngImage>,
+) -> Vec<SearchResultEntry> {
+    matching_emojis(pattern)
+        .into_iter()
+        .map(|(emoji, patterns, image_bytes)| {
+            SearchResultEntry::new(
+                load_icon(image_bytes),
+                patterns.to_string(),
+                Some(emoji.to_string()),
+                search_id,
+                true,
+            )
+        })
+        .collect()
+}
+
 pub struct EmojiSearcher {
     desktop: Arc<dyn DesktopIntegration>,
 }
@@ -177,22 +207,9 @@ impl Searcher for EmojiSearcher {
         let pattern = pattern.chars().skip(1).collect::<String>();
 
         if !pattern.is_empty() {
-            let search_result = EMOJI_ICON_PATTERNS
-                .into_iter()
-                .filter_map(|(emoji, (patterns, image_bytes))| {
-                    if patterns.contains(&pattern) {
-                        Some(SearchResultEntry::new(
-                            PngImage::from_data(image_bytes).ok(),
-                            patterns.to_string(),
-                            Some(emoji.to_string()),
-                            search_id,
-                            true,
-                        ))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+            let search_result = matching_emoji_entries(&pattern, search_id, |image_bytes| {
+                PngImage::from_data(image_bytes).ok()
+            });
 
             sink.send(search_result);
         }
@@ -203,5 +220,76 @@ impl Searcher for EmojiSearcher {
             .copy_text(emoji)
             .map_err(|error| format!("Could not copy emoji: {error}"))?;
         Ok(ExecutionAction::ExitApplication)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+
+    struct NoopDesktop;
+
+    impl DesktopIntegration for NoopDesktop {
+        fn copy_text(&self, _text: String) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn open_path(&self, _path: &Path) -> Result<(), String> {
+            unreachable!("emoji execution never opens files")
+        }
+    }
+
+    #[test]
+    fn colon_prefix_routes_to_emoji_search() {
+        let searcher = EmojiSearcher::new(Arc::new(NoopDesktop));
+
+        assert!(searcher.handles(":"));
+        assert!(searcher.handles(":thumbs"));
+        assert!(!searcher.handles("thumbs"));
+    }
+
+    #[test]
+    fn metadata_matching_is_substring_based_and_case_sensitive() {
+        let matches = matching_emojis("thumbs");
+        let values = matches
+            .iter()
+            .map(|(emoji, _, _)| *emoji)
+            .collect::<Vec<_>>();
+
+        assert!(values.contains(&"👍"));
+        assert!(values.contains(&"👎"));
+        assert!(matching_emojis("THUMBS").is_empty());
+        assert!(matching_emojis("definitely-not-present").is_empty());
+    }
+
+    #[test]
+    fn every_emoji_has_search_text_and_a_png_icon() {
+        const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+
+        assert!(!EMOJI_ICON_PATTERNS.is_empty());
+        for (emoji, (patterns, image_bytes)) in EMOJI_ICON_PATTERNS.entries() {
+            assert!(!emoji.is_empty());
+            assert!(!patterns.trim().is_empty(), "missing patterns for {emoji}");
+            assert!(
+                image_bytes.starts_with(PNG_SIGNATURE),
+                "invalid PNG icon for {emoji}"
+            );
+        }
+    }
+
+    #[test]
+    fn matched_metadata_is_mapped_to_executable_search_entries() {
+        let entries = matching_emoji_entries("thumbs", 17, |_| None);
+
+        assert_eq!(entries.len(), 2);
+        for entry in entries {
+            assert!(entry.icon.is_none());
+            assert!(entry.label.contains("thumbs"));
+            assert!(matches!(entry.value.as_deref(), Some("👍" | "👎")));
+            assert_eq!(entry.search_id, 17);
+            assert!(entry.valid);
+        }
     }
 }

@@ -1,3 +1,7 @@
+pub mod application {
+    pub mod controller;
+}
+
 pub mod config {
     pub mod config_manager;
 }
@@ -5,6 +9,7 @@ pub mod config {
 pub mod gui {
     pub mod message_event;
     pub mod pm_spotlight_app;
+    pub mod selection;
 }
 
 pub mod helpers {
