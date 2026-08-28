@@ -25,7 +25,13 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let search_manager = SearchManager::new(config);
+    let search_manager = match SearchManager::new(config) {
+        Ok(search_manager) => search_manager,
+        Err(error) => {
+            report_startup_error(&error);
+            return ExitCode::FAILURE;
+        }
+    };
     PMSpotlightApp::build(search_manager).run();
     ExitCode::SUCCESS
 }

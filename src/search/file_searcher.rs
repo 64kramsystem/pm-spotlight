@@ -10,7 +10,7 @@ use std::{
     thread,
 };
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use walkdir::{DirEntry, WalkDir};
 
 use super::{
@@ -27,7 +27,7 @@ const DISALLOWED_CHARS_MESSAGE: &str = "Only alphanum and `*_-. /&` are allowed"
 const MIN_CHARS: usize = 2;
 
 struct FileSearchPlan {
-    search_paths: Vec<(String, usize)>,
+    search_paths: Vec<(PathBuf, usize)>,
     skip_paths: Vec<Regex>,
     // It's noticeably slow to instantiate once for each file skip test.
     re_is_hidden: Regex,
@@ -40,15 +40,17 @@ pub struct FileSearcher {
 }
 
 impl FileSearcher {
-    pub fn new(config: Config, desktop: Arc<dyn DesktopIntegration>) -> Self {
-        Self::with_home(config, desktop, dirs::home_dir().unwrap())
+    pub fn new(config: Config, desktop: Arc<dyn DesktopIntegration>) -> Result<Self, String> {
+        let home_dir =
+            dirs::home_dir().ok_or_else(|| "Could not determine the home directory".to_string())?;
+        Self::with_home(config, desktop, home_dir)
     }
 
     pub fn with_home(
         config: Config,
         desktop: Arc<dyn DesktopIntegration>,
         home_dir: PathBuf,
-    ) -> Self {
+    ) -> Result<Self, String> {
         let search_paths = config
             .search_paths
             .into_iter()
@@ -59,9 +61,9 @@ impl FileSearcher {
             .skip_paths
             .iter()
             .map(|path| Self::process_skip_path_definition(path, &home_dir))
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, _>>()?;
 
-        Self {
+        Ok(Self {
             desktop,
             plan: Arc::new(FileSearchPlan {
                 search_paths,
@@ -69,10 +71,18 @@ impl FileSearcher {
                 re_is_hidden: Regex::new(r"/\.[^/]+$").unwrap(),
             }),
             cancellation: None,
+        })
+    }
+
+    pub(super) fn new_search(&self) -> Self {
+        Self {
+            desktop: Arc::clone(&self.desktop),
+            plan: Arc::clone(&self.plan),
+            cancellation: None,
         }
     }
 
-    fn process_search_path_definition(mut path: &str, home_dir: &Path) -> (String, usize) {
+    fn process_search_path_definition(mut path: &str, home_dir: &Path) -> (PathBuf, usize) {
         let mut depth = 255;
 
         let re_path_with_depth = Regex::new(r"(.+)\{(\d)\}$").unwrap();
@@ -82,10 +92,10 @@ impl FileSearcher {
             depth = captures.get(2).unwrap().as_str().parse().unwrap();
         }
 
-        if path.starts_with('/') {
-            (path.to_string(), depth)
+        if Path::new(path).is_absolute() {
+            (PathBuf::from(path), depth)
         } else {
-            (home_dir.join(path).to_str().unwrap().to_string(), depth)
+            (home_dir.join(path), depth)
         }
     }
 
@@ -93,24 +103,29 @@ impl FileSearcher {
     // Skip paths that match at any level, simply are prefixed with '/*/'.
     // Regexes are defined as case-insensitive.
     //
-    fn process_skip_path_definition(path: &str, home_dir: &Path) -> Regex {
-        let mut path = path.to_string();
+    fn process_skip_path_definition(path: &str, home_dir: &Path) -> Result<Regex, String> {
+        let full_path = if Path::new(path).is_absolute() {
+            PathBuf::from(path)
+        } else {
+            home_dir.join(path)
+        };
+        let full_path = full_path.to_str().ok_or_else(|| {
+            format!("Skip path {path:?} expands to a path that is not valid UTF-8")
+        })?;
+        let regex = format!("^{}$", Self::wildcard_regex(full_path));
 
-        // Handle home prefix
-        //
-        if !path.starts_with('/') {
-            path = home_dir.join(path).to_str().unwrap().to_string();
-        }
+        RegexBuilder::new(&regex)
+            .case_insensitive(true)
+            .build()
+            .map_err(|error| format!("Could not compile skip path {path:?}: {error}"))
+    }
 
-        // Handle wildcards.
-        //
-        let mut regex = path.replace('.', r"\.").replace('*', ".*");
-
-        // Handle full-match and case-sensitivenes
-        //
-        regex = format!("(?i)^{}$", regex);
-
-        Regex::new(&regex).unwrap()
+    fn wildcard_regex(pattern: &str) -> String {
+        pattern
+            .split('*')
+            .map(regex::escape)
+            .collect::<Vec<_>>()
+            .join(".*")
     }
 
     // Skip entry format: (filename, is_basename).
@@ -133,10 +148,10 @@ impl FileSearcher {
 
     fn include_entry(entry: &DirEntry, re_pattern: &Regex) -> Option<String> {
         let path = entry.path();
-        let filename = path.file_name().unwrap().to_str().unwrap();
+        let filename = path.file_name()?.to_str()?;
 
         if re_pattern.is_match(filename) {
-            Some(path.to_str().unwrap().to_string())
+            Some(path.to_str()?.to_string())
         } else {
             None
         }
@@ -152,11 +167,7 @@ impl FileSearcher {
         // Ignore nonexisting search paths; a legitimate use case is, for example, a shared config
         // across multiple machines.
         //
-        for (search_path, depth) in plan
-            .search_paths
-            .iter()
-            .filter(|(path, _)| Path::new(path).is_dir())
-        {
+        for (search_path, depth) in plan.search_paths.iter().filter(|(path, _)| path.is_dir()) {
             if cancellation.load(Ordering::Acquire) {
                 return None;
             }
@@ -232,9 +243,20 @@ impl Searcher for FileSearcher {
             return;
         }
 
-        let mut pattern = pattern.replace('.', r"\.").replace('*', ".*");
-        pattern = format!("(?i){}", pattern);
-        let re_pattern = Regex::new(&pattern).unwrap();
+        let pattern = Self::wildcard_regex(&pattern);
+        let re_pattern = match RegexBuilder::new(&pattern).case_insensitive(true).build() {
+            Ok(re_pattern) => re_pattern,
+            Err(error) => {
+                sink.send(vec![SearchResultEntry::new(
+                    None,
+                    format!("Could not compile the search pattern: {error}"),
+                    None,
+                    search_id,
+                    false,
+                )]);
+                return;
+            }
+        };
         let plan = Arc::clone(&self.plan);
         let cancellation = Arc::new(AtomicBool::new(false));
         self.cancellation = Some(Arc::clone(&cancellation));

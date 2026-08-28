@@ -143,13 +143,20 @@ fn config(search_paths: &[&str], skip_paths: &[&str]) -> Config {
     }
 }
 
+fn search_manager(
+    config: Config,
+    desktop: Arc<dyn DesktopIntegration>,
+    home_dir: PathBuf,
+) -> SearchManager {
+    SearchManager::with_dependencies(config, desktop, home_dir).unwrap()
+}
+
 #[test]
 fn emoji_search_routes_execution_to_the_clipboard() {
     let home = TempDirectory::new();
     let desktop = Arc::new(RecordingDesktop::default());
     let sink = Arc::new(CollectingSink::default());
-    let mut manager =
-        SearchManager::with_dependencies(config(&[], &[]), desktop.clone(), home.path.clone());
+    let mut manager = search_manager(config(&[], &[]), desktop.clone(), home.path.clone());
 
     let search_id = manager.search(":".to_string(), sink.clone());
 
@@ -174,8 +181,8 @@ fn file_search_honors_home_depth_hidden_and_skip_rules() {
 
     let desktop = Arc::new(RecordingDesktop::default());
     let sink = Arc::new(CollectingSink::default());
-    let mut manager = SearchManager::with_dependencies(
-        config(&["documents{2}"], &["documents/ignored"]),
+    let mut manager = search_manager(
+        config(&["documents{2}"], &["documents/ignor*"]),
         desktop,
         home.path.clone(),
     );
@@ -208,7 +215,7 @@ fn file_execution_uses_the_desktop_integration_and_reports_failures() {
     let file = home.create_file("documents/target.txt");
     let desktop = Arc::new(RecordingDesktop::default());
     let sink = Arc::new(CollectingSink::default());
-    let mut manager = SearchManager::with_dependencies(
+    let mut manager = search_manager(
         config(&["documents"], &[]),
         desktop.clone(),
         home.path.clone(),
@@ -248,7 +255,7 @@ fn file_execution_uses_the_desktop_integration_and_reports_failures() {
 fn invalid_file_patterns_return_a_non_executable_message() {
     let home = TempDirectory::new();
     let sink = Arc::new(CollectingSink::default());
-    let mut manager = SearchManager::with_dependencies(
+    let mut manager = search_manager(
         config(&[], &[]),
         Arc::new(RecordingDesktop::default()),
         home.path.clone(),
@@ -269,7 +276,7 @@ fn invalid_file_patterns_return_a_non_executable_message() {
 fn every_search_gets_a_new_identifier_even_without_results() {
     let home = TempDirectory::new();
     let sink = Arc::new(CollectingSink::default());
-    let mut manager = SearchManager::with_dependencies(
+    let mut manager = search_manager(
         config(&[], &[]),
         Arc::new(RecordingDesktop::default()),
         home.path.clone(),
@@ -289,7 +296,7 @@ fn filesystem_search_returns_before_results_are_delivered() {
     let home = TempDirectory::new();
     home.create_file("documents/target.txt");
     let sink = Arc::new(CollectingSink::with_send_delay(Duration::from_millis(750)));
-    let mut manager = SearchManager::with_dependencies(
+    let mut manager = search_manager(
         config(&["documents"], &[]),
         Arc::new(RecordingDesktop::default()),
         home.path.clone(),
@@ -311,7 +318,7 @@ fn overlapping_search_roots_return_each_file_once() {
     let target = home.create_file("documents/nested/target.txt");
 
     let sink = Arc::new(CollectingSink::default());
-    let mut manager = SearchManager::with_dependencies(
+    let mut manager = search_manager(
         config(&["documents", "documents/nested"], &[]),
         Arc::new(RecordingDesktop::default()),
         home.path.clone(),
@@ -325,4 +332,71 @@ fn overlapping_search_roots_return_each_file_once() {
     assert_eq!(batches[0][0].search_id, search_id);
     assert!(batches[0][0].valid);
     assert_eq!(batches[0][0].value.as_deref(), target.to_str());
+}
+
+#[test]
+fn skip_paths_treat_regex_metacharacters_as_literals() {
+    let home = TempDirectory::new();
+    home.create_file("documents/[archive]+(old)?/skipped_target.txt");
+    let visible = home.create_file("documents/visible_target.txt");
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(&["documents"], &["documents/[archive]+(old)?"]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("target".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].len(), 1);
+    assert_eq!(batches[0][0].value.as_deref(), visible.to_str());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn non_utf8_filenames_are_skipped_without_failing_the_search() {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+
+    let home = TempDirectory::new();
+    let documents = home.path.join("documents");
+    fs::create_dir(&documents).unwrap();
+    fs::write(
+        documents.join(OsString::from_vec(b"invalid_target_\xff".to_vec())),
+        b"test",
+    )
+    .unwrap();
+    let visible = home.create_file("documents/visible_target.txt");
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(&["documents"], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("target".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].len(), 1);
+    assert_eq!(batches[0][0].value.as_deref(), visible.to_str());
+}
+
+#[cfg(unix)]
+#[test]
+fn invalid_expanded_skip_paths_return_configuration_errors() {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+
+    let home_dir = PathBuf::from(OsString::from_vec(b"/tmp/pm-spotlight-\xff".to_vec()));
+    let result = SearchManager::with_dependencies(
+        config(&[], &["ignored"]),
+        Arc::new(RecordingDesktop::default()),
+        home_dir,
+    );
+
+    match result {
+        Ok(_) => panic!("invalid expanded skip path was accepted"),
+        Err(error) => assert!(error.contains("not valid UTF-8")),
+    }
 }
