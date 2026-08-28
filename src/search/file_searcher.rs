@@ -1,4 +1,4 @@
-use std::{fs, os::unix::prelude::CommandExt, path::Path, process::Command};
+use std::{fs, path::Path};
 
 use fltk::app::Sender;
 use regex::Regex;
@@ -8,7 +8,10 @@ use super::{search_result_entry::SearchResultEntry, searcher::Searcher};
 use crate::{
     config::config_manager::Config,
     gui::message_event::MessageEvent::{self, UpdateList},
-    helpers::{clipboard_management::copy_to_clipboard, filenames::map_filenames_to_short_names},
+    helpers::{
+        clipboard_management::copy_to_clipboard, file_execution::open_path,
+        filenames::map_filenames_to_short_names,
+    },
 };
 
 const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_. /&']";
@@ -205,14 +208,9 @@ impl Searcher for FileSearcher {
     }
 
     fn execute(&self, filename: String) {
-        // This is Unix-specific, in two ways:
-        //
-        // - it uses xdg-open
-        // - exec() will replace the pm-spotlight image with the executed program (unless it errors)
-        //
-        // this is currently fine.
-        //
-        let _ = Command::new("xdg-open").args([filename]).exec();
+        if open_path(Path::new(&filename)).is_ok() {
+            std::process::exit(0);
+        }
     }
 
     fn alt_execute(&self, filename: String) -> bool {

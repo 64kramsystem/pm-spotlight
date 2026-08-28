@@ -13,6 +13,7 @@ mod search {
 
 mod helpers {
     pub mod clipboard_management;
+    pub mod file_execution;
     pub mod filenames;
 }
 
@@ -26,6 +27,11 @@ use search::search_manager::SearchManager;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
+    #[cfg(target_os = "linux")]
+    if helpers::clipboard_management::run_clipboard_server_if_requested() {
+        return ExitCode::SUCCESS;
+    }
+
     let config = match ConfigManager::load_configuration() {
         Ok(config) => config,
         Err(error) => {

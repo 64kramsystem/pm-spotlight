@@ -7,6 +7,7 @@ version = "0.1.0"
 strip = true
 
 [dependencies]
+arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
 dirs = "6.0.0"
 fltk = "=1.5.23"
 phf = { version = "0.11.3", features = ["macros"] }
@@ -14,3 +15,11 @@ regex = "1.11.1"
 serde = { version = "1.0.217", features = ["derive"] }
 toml = "0.8.19"
 walkdir = "2.5.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd = { version = "0.13.13", default-features = false, features = ["async-io", "open_uri"] }
+async-io = "2.6.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSWorkspace"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSString", "NSURL"] }

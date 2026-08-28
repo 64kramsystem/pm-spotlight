@@ -1,20 +1,50 @@
-use std::io::Write;
-use std::process::{Command, Stdio};
+use arboard::Clipboard;
+
+#[cfg(target_os = "linux")]
+use arboard::SetExtLinux;
+#[cfg(target_os = "linux")]
+use std::{
+    ffi::OsStr,
+    io::{Read, Write},
+    process::{Command, Stdio},
+};
+
+#[cfg(target_os = "linux")]
+const CLIPBOARD_SERVER_ARG: &str = "--internal-clipboard-server";
 
 pub fn copy_to_clipboard(text: String) {
-    // Copypasta was unstable; sometimes it didn't copy to clipboard, sometimes it has strange side
-    // effects, like not pasting on the first paste invocation, or the paste being displayed in the
-    // destination program only after other chars were typed.
-    //
-    let mut child = Command::new("xsel")
-        .arg("-ib")
-        .stdin(Stdio::piped())
-        .spawn()
-        .unwrap();
-    let mut child_stdin = child.stdin.take().unwrap();
+    #[cfg(target_os = "linux")]
+    {
+        let mut server = Command::new(std::env::current_exe().unwrap())
+            .arg(CLIPBOARD_SERVER_ARG)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
 
-    write!(child_stdin, "{}", text).unwrap();
+        server
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(text.as_bytes())
+            .unwrap();
+    }
 
-    drop(child_stdin);
-    child.wait().unwrap();
+    #[cfg(not(target_os = "linux"))]
+    Clipboard::new().unwrap().set_text(text).unwrap();
+}
+
+#[cfg(target_os = "linux")]
+pub fn run_clipboard_server_if_requested() -> bool {
+    if std::env::args_os().nth(1).as_deref() != Some(OsStr::new(CLIPBOARD_SERVER_ARG)) {
+        return false;
+    }
+
+    let mut text = String::new();
+    std::io::stdin().read_to_string(&mut text).unwrap();
+    let mut clipboard = Clipboard::new().unwrap();
+    clipboard.set().wait().text(text).unwrap();
+
+    true
 }
