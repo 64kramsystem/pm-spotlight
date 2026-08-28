@@ -1,7 +1,12 @@
 use std::{
     fs,
+    panic::{catch_unwind, AssertUnwindSafe},
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
 };
 
 use regex::Regex;
@@ -20,13 +25,17 @@ const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_. /&']";
 const DISALLOWED_CHARS_MESSAGE: &str = "Only alphanum and `*_-. /&` are allowed";
 const MIN_CHARS: usize = 2;
 
-pub struct FileSearcher {
-    desktop: Arc<dyn DesktopIntegration>,
+struct FileSearchPlan {
     search_paths: Vec<(String, usize)>,
     skip_paths: Vec<Regex>,
-    stop_search: bool,
     // It's noticeably slow to instantiate once for each file skip test.
     re_is_hidden: Regex,
+}
+
+pub struct FileSearcher {
+    desktop: Arc<dyn DesktopIntegration>,
+    plan: Arc<FileSearchPlan>,
+    cancellation: Option<Arc<AtomicBool>>,
 }
 
 impl FileSearcher {
@@ -53,10 +62,12 @@ impl FileSearcher {
 
         Self {
             desktop,
-            search_paths,
-            skip_paths,
-            stop_search: false,
-            re_is_hidden: Regex::new(r"/\.[^/]+$").unwrap(),
+            plan: Arc::new(FileSearchPlan {
+                search_paths,
+                skip_paths,
+                re_is_hidden: Regex::new(r"/\.[^/]+$").unwrap(),
+            }),
+            cancellation: None,
         }
     }
 
@@ -103,18 +114,18 @@ impl FileSearcher {
 
     // Skip entry format: (filename, is_basename).
     //
-    fn skip_entry(&self, entry: &DirEntry) -> bool {
+    fn skip_entry(plan: &FileSearchPlan, entry: &DirEntry) -> bool {
         let fullname = if let Some(fullname) = entry.path().to_str() {
             fullname.to_string()
         } else {
             return true;
         };
 
-        if self.re_is_hidden.is_match(&fullname) {
+        if plan.re_is_hidden.is_match(&fullname) {
             return true;
         }
 
-        self.skip_paths
+        plan.skip_paths
             .iter()
             .any(|skip_re| skip_re.is_match(&fullname))
     }
@@ -129,6 +140,67 @@ impl FileSearcher {
             None
         }
     }
+
+    fn find_matches(
+        plan: &FileSearchPlan,
+        re_pattern: &Regex,
+        cancellation: &AtomicBool,
+    ) -> Option<Vec<String>> {
+        let mut matching_fullnames = Vec::new();
+
+        // Ignore nonexisting search paths; a legitimate use case is, for example, a shared config
+        // across multiple machines.
+        //
+        for (search_path, depth) in plan
+            .search_paths
+            .iter()
+            .filter(|(path, _)| Path::new(path).is_dir())
+        {
+            if cancellation.load(Ordering::Acquire) {
+                return None;
+            }
+
+            let walker = WalkDir::new(search_path)
+                .min_depth(1)
+                .max_depth(*depth)
+                .into_iter()
+                .filter_entry(|entry| {
+                    !cancellation.load(Ordering::Acquire) && !Self::skip_entry(plan, entry)
+                });
+
+            // We can't filter out+in in a single pass, because if we filter out a directory, WalkDir
+            // will stop recursing.
+            //
+            for entry in walker {
+                if cancellation.load(Ordering::Acquire) {
+                    return None;
+                }
+
+                match entry {
+                    Ok(entry) => {
+                        if let Some(fullname) = Self::include_entry(&entry, re_pattern) {
+                            matching_fullnames.push(fullname);
+                        }
+                    }
+                    Err(error) => eprintln!("{error:?}"),
+                }
+            }
+        }
+
+        Some(matching_fullnames)
+    }
+
+    fn cancel_active_search(&mut self) {
+        if let Some(cancellation) = self.cancellation.take() {
+            cancellation.store(true, Ordering::Release);
+        }
+    }
+}
+
+impl Drop for FileSearcher {
+    fn drop(&mut self) {
+        self.cancel_active_search();
+    }
 }
 
 impl Searcher for FileSearcher {
@@ -137,6 +209,9 @@ impl Searcher for FileSearcher {
     }
 
     fn search(&mut self, pattern: String, sink: Arc<dyn SearchResultSink>, search_id: u32) {
+        // SearchManager stops a searcher before replacing it. Keep direct reuse safe as well.
+        self.cancel_active_search();
+
         let re_disallowed_chars = Regex::new(DISALLOWED_PATH_CHARS).unwrap();
 
         if re_disallowed_chars.is_match(&pattern) {
@@ -159,51 +234,67 @@ impl Searcher for FileSearcher {
         let mut pattern = pattern.replace('.', r"\.").replace('*', ".*");
         pattern = format!("(?i){}", pattern);
         let re_pattern = Regex::new(&pattern).unwrap();
+        let plan = Arc::clone(&self.plan);
+        let cancellation = Arc::new(AtomicBool::new(false));
+        self.cancellation = Some(Arc::clone(&cancellation));
+        let worker_sink = Arc::clone(&sink);
 
-        let search_in_path = |(search_path, depth): &(String, usize)| {
-            let walker = WalkDir::new(search_path)
-                .min_depth(1)
-                .max_depth(*depth)
-                .into_iter()
-                .filter_entry(|e| {
-                    if self.stop_search {
-                        return false;
-                    };
-                    !self.skip_entry(e)
-                });
+        let worker = thread::Builder::new()
+            .name(format!("file-search-{search_id}"))
+            .spawn(move || {
+                let search_result = catch_unwind(AssertUnwindSafe(|| {
+                    let matching_fullnames = Self::find_matches(&plan, &re_pattern, &cancellation)?;
 
-            // We can't filter out+in in a single pass, because if we filter out a directory, WalkDir will
-            // stop recursing.
-            //
-            walker.into_iter().filter_map(|entry| match entry {
-                Ok(entry) => Self::include_entry(&entry, &re_pattern),
-                Err(error) => {
-                    eprintln!("{:?}", error);
-                    None
+                    let filename_labels = map_filenames_to_short_names(matching_fullnames);
+
+                    if cancellation.load(Ordering::Acquire) {
+                        return None;
+                    }
+
+                    Some(
+                        filename_labels
+                            .into_iter()
+                            .map(|(label, fullname)| {
+                                SearchResultEntry::new(None, label, Some(fullname), search_id, true)
+                            })
+                            .collect(),
+                    )
+                }));
+
+                match search_result {
+                    Ok(Some(processed_result)) if !cancellation.load(Ordering::Acquire) => {
+                        worker_sink.send(processed_result);
+                    }
+                    Ok(_) => {}
+                    Err(panic) if !cancellation.load(Ordering::Acquire) => {
+                        let reason = panic
+                            .downcast_ref::<&str>()
+                            .copied()
+                            .or_else(|| panic.downcast_ref::<String>().map(String::as_str))
+                            .unwrap_or("unknown worker failure");
+
+                        worker_sink.send(vec![SearchResultEntry::new(
+                            None,
+                            format!("Filesystem search failed unexpectedly: {reason}"),
+                            None,
+                            search_id,
+                            false,
+                        )]);
+                    }
+                    Err(_) => {}
                 }
-            })
-        };
+            });
 
-        // Ignore nonexisting search paths; a legitimate use case is, for example, a shared config
-        // across multiple machines.
-        //
-        let matching_fullnames = self
-            .search_paths
-            .iter()
-            .filter(|(path, _)| Path::new(path).is_dir())
-            .flat_map(search_in_path)
-            .collect::<Vec<String>>();
-
-        let filename_labels = map_filenames_to_short_names(matching_fullnames);
-
-        let processed_result = filename_labels
-            .into_iter()
-            .map(|(label, fullname)| {
-                SearchResultEntry::new(None, label, Some(fullname), search_id, true)
-            })
-            .collect();
-
-        sink.send(processed_result);
+        if let Err(error) = worker {
+            self.cancellation = None;
+            sink.send(vec![SearchResultEntry::new(
+                None,
+                format!("Could not start the filesystem search: {error}"),
+                None,
+                search_id,
+                false,
+            )]);
+        }
     }
 
     fn execute(&self, filename: String) -> Result<ExecutionAction, String> {
@@ -225,5 +316,9 @@ impl Searcher for FileSearcher {
             .map_err(|error| format!("Could not copy the path for {filename:?}: {error}"))?;
 
         Ok(ExecutionAction::ExitApplication)
+    }
+
+    fn stop(&mut self) {
+        self.cancel_active_search();
     }
 }

@@ -3,9 +3,9 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
+        Arc, Condvar, Mutex,
     },
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use pm_spotlight::{
@@ -82,14 +82,54 @@ impl DesktopIntegration for RecordingDesktop {
     }
 }
 
-#[derive(Default)]
 struct CollectingSink {
     batches: Mutex<Vec<Vec<SearchResultEntry>>>,
+    received: Condvar,
+    send_delay: Duration,
+}
+
+impl Default for CollectingSink {
+    fn default() -> Self {
+        Self {
+            batches: Mutex::new(Vec::new()),
+            received: Condvar::new(),
+            send_delay: Duration::ZERO,
+        }
+    }
+}
+
+impl CollectingSink {
+    fn with_send_delay(send_delay: Duration) -> Self {
+        Self {
+            send_delay,
+            ..Self::default()
+        }
+    }
+
+    fn wait_for_batches(
+        &self,
+        expected_count: usize,
+        timeout: Duration,
+    ) -> Vec<Vec<SearchResultEntry>> {
+        let batches = self.batches.lock().unwrap();
+        let (batches, wait_result) = self
+            .received
+            .wait_timeout_while(batches, timeout, |batches| batches.len() < expected_count)
+            .unwrap();
+
+        assert!(
+            !wait_result.timed_out(),
+            "timed out waiting for search results"
+        );
+        batches.clone()
+    }
 }
 
 impl SearchResultSink for CollectingSink {
     fn send(&self, entries: Vec<SearchResultEntry>) {
+        std::thread::sleep(self.send_delay);
         self.batches.lock().unwrap().push(entries);
+        self.received.notify_all();
     }
 }
 
@@ -142,7 +182,7 @@ fn file_search_honors_home_depth_hidden_and_skip_rules() {
 
     let search_id = manager.search("target".to_string(), sink.clone());
 
-    let batches = sink.batches.lock().unwrap();
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
     assert_eq!(batches.len(), 1);
     let mut values = batches[0]
         .iter()
@@ -173,7 +213,8 @@ fn file_execution_uses_the_desktop_integration_and_reports_failures() {
         desktop.clone(),
         home.path.clone(),
     );
-    manager.search("target".to_string(), sink);
+    manager.search("target".to_string(), sink.clone());
+    sink.wait_for_batches(1, Duration::from_secs(2));
 
     assert_eq!(
         manager.execute(file.to_str().unwrap().to_string()).unwrap(),
@@ -241,4 +282,49 @@ fn every_search_gets_a_new_identifier_even_without_results() {
     let batches = sink.batches.lock().unwrap();
     assert_eq!(batches.len(), 1);
     assert!(batches[0].is_empty());
+}
+
+#[test]
+fn filesystem_search_returns_before_results_are_delivered() {
+    let home = TempDirectory::new();
+    home.create_file("documents/target.txt");
+    let sink = Arc::new(CollectingSink::with_send_delay(Duration::from_millis(750)));
+    let mut manager = SearchManager::with_dependencies(
+        config(&["documents"], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    let started = Instant::now();
+    manager.search("target".to_string(), sink.clone());
+
+    assert!(
+        started.elapsed() < Duration::from_millis(500),
+        "filesystem search waited for result delivery"
+    );
+    sink.wait_for_batches(1, Duration::from_secs(2));
+}
+
+#[test]
+fn filesystem_worker_failures_are_reported_as_invalid_results() {
+    let home = TempDirectory::new();
+    home.create_file("documents/target.txt");
+
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = SearchManager::with_dependencies(
+        config(&["documents", "documents"], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    let search_id = manager.search("target".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].len(), 1);
+    assert_eq!(batches[0][0].search_id, search_id);
+    assert!(!batches[0][0].valid);
+    assert!(batches[0][0]
+        .label
+        .contains("Filesystem search failed unexpectedly"));
 }
