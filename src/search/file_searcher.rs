@@ -19,7 +19,10 @@ use super::{
 };
 use crate::{
     config::config_manager::Config,
-    helpers::{desktop_integration::DesktopIntegration, filenames::map_filenames_to_short_names},
+    helpers::{
+        desktop_integration::DesktopIntegration,
+        filenames::{map_filenames_to_short_names, sort_by_basename_match},
+    },
 };
 
 const DISALLOWED_PATH_CHARS: &str = r"[^-\w*_. /&']";
@@ -268,8 +271,11 @@ impl Searcher for FileSearcher {
             return;
         }
 
-        let pattern = Self::wildcard_regex(&pattern);
-        let re_pattern = match RegexBuilder::new(&pattern).case_insensitive(true).build() {
+        let regex_pattern = Self::wildcard_regex(&pattern);
+        let re_pattern = match RegexBuilder::new(&regex_pattern)
+            .case_insensitive(true)
+            .build()
+        {
             Ok(re_pattern) => re_pattern,
             Err(error) => {
                 sink.send(vec![SearchResultEntry::new(
@@ -295,7 +301,14 @@ impl Searcher for FileSearcher {
                     let matching_fullnames =
                         match_finder.find_matches(&plan, &re_pattern, &cancellation)?;
 
-                    let filename_labels = map_filenames_to_short_names(matching_fullnames);
+                    if cancellation.load(Ordering::Acquire) {
+                        return None;
+                    }
+
+                    let mut filename_labels = map_filenames_to_short_names(matching_fullnames)
+                        .into_iter()
+                        .collect::<Vec<_>>();
+                    sort_by_basename_match(&mut filename_labels, &pattern, &re_pattern);
 
                     if cancellation.load(Ordering::Acquire) {
                         return None;

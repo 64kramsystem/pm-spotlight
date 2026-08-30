@@ -276,6 +276,40 @@ fn file_search_is_case_insensitive_and_supports_wildcards() {
 }
 
 #[test]
+fn file_search_orders_results_by_basename_match_closeness() {
+    let home = TempDirectory::new();
+    let exact = home.path.join("documents/mp3");
+    let prefix = home.path.join("documents/mp3-tools");
+    fs::create_dir_all(&exact).unwrap();
+    fs::create_dir_all(&prefix).unwrap();
+    let early_substring = home.create_file("documents/music/my-mp3");
+    let later_substring = home.create_file("documents/music/song.mp3");
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(&["documents"], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("mp3".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    let values = batches[0]
+        .iter()
+        .map(|entry| entry.value.as_deref().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        values,
+        [
+            exact.to_str().unwrap(),
+            prefix.to_str().unwrap(),
+            early_substring.to_str().unwrap(),
+            later_substring.to_str().unwrap(),
+        ]
+    );
+}
+
+#[test]
 fn periods_in_file_queries_are_matched_literally() {
     let home = TempDirectory::new();
     let expected = home.create_file("documents/report.txt");
