@@ -81,3 +81,17 @@ fn duplicate_full_paths_are_collapsed() {
         HashMap::from([("report.txt".to_string(), "/one/report.txt".to_string())])
     );
 }
+
+#[test]
+fn equivalent_paths_and_root_level_name_collisions_do_not_panic() {
+    let labels =
+        map_filenames_to_short_names(["/a/b", "/a/./b", "/x/a/b"].map(String::from).to_vec());
+
+    assert_eq!(
+        labels,
+        HashMap::from([
+            ("/a/b".to_string(), "/a/b".to_string()),
+            ("x/a/b".to_string(), "/x/a/b".to_string()),
+        ])
+    );
+}

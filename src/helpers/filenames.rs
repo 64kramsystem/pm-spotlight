@@ -11,7 +11,7 @@ use regex::Regex;
 //
 //
 pub fn map_filenames_to_short_names(filenames: Vec<String>) -> HashMap<String, String> {
-    let filenames = filenames.into_iter().collect::<HashSet<_>>();
+    let mut seen = HashSet::new();
 
     // Working set format: short name -> parent
     //
@@ -23,6 +23,9 @@ pub fn map_filenames_to_short_names(filenames: Vec<String>) -> HashMap<String, S
 
     for filename in &filenames {
         let path = Path::new(filename);
+        if !seen.insert(path) {
+            continue;
+        }
 
         let basename = Path::new(path.file_name().unwrap()).to_path_buf();
         let parent = path.parent().unwrap();
@@ -44,7 +47,11 @@ pub fn map_filenames_to_short_names(filenames: Vec<String>) -> HashMap<String, S
                 result.insert(shortname, full_filename);
             } else {
                 for parent in &parents {
-                    let new_parent = parent.parent().unwrap();
+                    let Some(new_parent) = parent.parent() else {
+                        let full_filename = parent.join(&shortname).to_str().unwrap().to_string();
+                        result.insert(full_filename.clone(), full_filename);
+                        continue;
+                    };
                     let super_dir = parent.strip_prefix(new_parent).unwrap();
                     let new_shortname = Path::new(super_dir).join(&shortname);
 

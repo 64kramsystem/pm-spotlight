@@ -329,6 +329,60 @@ fn periods_in_file_queries_are_matched_literally() {
 }
 
 #[test]
+fn slash_queries_match_immediate_parents_and_keep_basename_ranking() {
+    let home = TempDirectory::new();
+    let exact = home.create_file("documents/Foo/bar");
+    let prefix = home.create_file("documents/Foo/bar-extra");
+    let substring = home.create_file("documents/Foo/my-bar");
+    home.create_file("documents/foo/other/bar");
+    home.create_file("documents/other/foo-bar");
+    home.create_file("documents/bar");
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(&["documents", "documents/Foo"], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("foo/bar".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    let values = batches[0]
+        .iter()
+        .map(|entry| entry.value.as_deref().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        values,
+        [
+            exact.to_str().unwrap(),
+            prefix.to_str().unwrap(),
+            substring.to_str().unwrap()
+        ]
+    );
+}
+
+#[test]
+fn slash_queries_support_multiple_parents_wildcards_and_literal_periods() {
+    let home = TempDirectory::new();
+    let expected = home.create_file("documents/project-1/my-Foo/bar.txt");
+    home.create_file("documents/project-1/my-Foo/barXtxt");
+    home.create_file("documents/project-1/my-Foo/other/bar.txt");
+    home.create_file("documents/other/my-Foo/bar.txt");
+    let sink = Arc::new(CollectingSink::default());
+    let mut manager = search_manager(
+        config(&["documents"], &[]),
+        Arc::new(RecordingDesktop::default()),
+        home.path.clone(),
+    );
+
+    manager.search("PROJECT/f*o/b*r.txt".to_string(), sink.clone());
+
+    let batches = sink.wait_for_batches(1, Duration::from_secs(2));
+    assert_eq!(batches[0].len(), 1);
+    assert_eq!(batches[0][0].value.as_deref(), expected.to_str());
+}
+
+#[test]
 fn absolute_and_missing_search_roots_are_handled() {
     let home = TempDirectory::new();
     let expected = home.create_file("absolute/target.txt");

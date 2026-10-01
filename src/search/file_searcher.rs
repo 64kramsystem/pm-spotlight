@@ -40,7 +40,7 @@ trait FileMatchFinder: Send + Sync {
     fn find_matches(
         &self,
         plan: &FileSearchPlan,
-        re_pattern: &Regex,
+        patterns: &[Regex],
         cancellation: &AtomicBool,
     ) -> Option<Vec<String>>;
 }
@@ -51,10 +51,10 @@ impl FileMatchFinder for WalkDirMatchFinder {
     fn find_matches(
         &self,
         plan: &FileSearchPlan,
-        re_pattern: &Regex,
+        patterns: &[Regex],
         cancellation: &AtomicBool,
     ) -> Option<Vec<String>> {
-        FileSearcher::find_matches(plan, re_pattern, cancellation)
+        FileSearcher::find_matches(plan, patterns, cancellation)
     }
 }
 
@@ -174,11 +174,17 @@ impl FileSearcher {
             .any(|skip_re| skip_re.is_match(&fullname))
     }
 
-    fn include_entry(entry: &DirEntry, re_pattern: &Regex) -> Option<String> {
+    fn include_entry(entry: &DirEntry, patterns: &[Regex]) -> Option<String> {
         let path = entry.path();
-        let filename = path.file_name()?.to_str()?;
+        let mut ancestors = path.ancestors();
 
-        if re_pattern.is_match(filename) {
+        if patterns.iter().rev().all(|pattern| {
+            ancestors
+                .next()
+                .and_then(Path::file_name)
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| pattern.is_match(name))
+        }) {
             Some(path.to_str()?.to_string())
         } else {
             None
@@ -187,7 +193,7 @@ impl FileSearcher {
 
     fn find_matches(
         plan: &FileSearchPlan,
-        re_pattern: &Regex,
+        patterns: &[Regex],
         cancellation: &AtomicBool,
     ) -> Option<Vec<String>> {
         let mut matching_fullnames = HashSet::new();
@@ -200,25 +206,28 @@ impl FileSearcher {
                 return None;
             }
 
-            let walker = WalkDir::new(search_path)
+            let mut walker = WalkDir::new(search_path)
                 .min_depth(1)
                 .max_depth(*depth)
-                .into_iter()
-                .filter_entry(|entry| {
-                    !cancellation.load(Ordering::Acquire) && !Self::skip_entry(plan, entry)
-                });
+                .into_iter();
 
-            // We can't filter out+in in a single pass, because if we filter out a directory, WalkDir
-            // will stop recursing.
-            //
-            for entry in walker {
+            loop {
                 if cancellation.load(Ordering::Acquire) {
                     return None;
                 }
+                let Some(entry) = walker.next() else {
+                    break;
+                };
 
                 match entry {
                     Ok(entry) => {
-                        if let Some(fullname) = Self::include_entry(&entry, re_pattern) {
+                        if Self::skip_entry(plan, &entry) {
+                            if entry.file_type().is_dir() {
+                                walker.skip_current_dir();
+                            }
+                            continue;
+                        }
+                        if let Some(fullname) = Self::include_entry(&entry, patterns) {
                             matching_fullnames.insert(fullname);
                         }
                     }
@@ -271,12 +280,16 @@ impl Searcher for FileSearcher {
             return;
         }
 
-        let regex_pattern = Self::wildcard_regex(&pattern);
-        let re_pattern = match RegexBuilder::new(&regex_pattern)
-            .case_insensitive(true)
-            .build()
+        let patterns = match pattern
+            .split('/')
+            .map(|part| {
+                RegexBuilder::new(&Self::wildcard_regex(part))
+                    .case_insensitive(true)
+                    .build()
+            })
+            .collect::<Result<Vec<_>, _>>()
         {
-            Ok(re_pattern) => re_pattern,
+            Ok(patterns) => patterns,
             Err(error) => {
                 sink.send(vec![SearchResultEntry::new(
                     None,
@@ -299,7 +312,7 @@ impl Searcher for FileSearcher {
             .spawn(move || {
                 let search_result = catch_unwind(AssertUnwindSafe(|| {
                     let matching_fullnames =
-                        match_finder.find_matches(&plan, &re_pattern, &cancellation)?;
+                        match_finder.find_matches(&plan, &patterns, &cancellation)?;
 
                     if cancellation.load(Ordering::Acquire) {
                         return None;
@@ -308,7 +321,11 @@ impl Searcher for FileSearcher {
                     let mut filename_labels = map_filenames_to_short_names(matching_fullnames)
                         .into_iter()
                         .collect::<Vec<_>>();
-                    sort_by_basename_match(&mut filename_labels, &pattern, &re_pattern);
+                    sort_by_basename_match(
+                        &mut filename_labels,
+                        pattern.rsplit('/').next().unwrap(),
+                        patterns.last().unwrap(),
+                    );
 
                     if cancellation.load(Ordering::Acquire) {
                         return None;
@@ -445,7 +462,7 @@ mod tests {
         fn find_matches(
             &self,
             _plan: &FileSearchPlan,
-            _re_pattern: &Regex,
+            _patterns: &[Regex],
             cancellation: &AtomicBool,
         ) -> Option<Vec<String>> {
             self.started.send(()).unwrap();
@@ -462,7 +479,7 @@ mod tests {
         fn find_matches(
             &self,
             _plan: &FileSearchPlan,
-            _re_pattern: &Regex,
+            _patterns: &[Regex],
             _cancellation: &AtomicBool,
         ) -> Option<Vec<String>> {
             panic!("simulated traversal failure")
@@ -551,7 +568,7 @@ mod tests {
         let cancellation = AtomicBool::new(true);
         let pattern = Regex::new("target").unwrap();
 
-        assert!(FileSearcher::find_matches(&searcher.plan, &pattern, &cancellation).is_none());
+        assert!(FileSearcher::find_matches(&searcher.plan, &[pattern], &cancellation).is_none());
     }
 
     #[test]
