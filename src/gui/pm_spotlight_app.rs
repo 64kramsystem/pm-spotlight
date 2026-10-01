@@ -2,8 +2,9 @@ use fltk::{
     app::{self, is_event_shift, set_focus, App, Receiver, Sender},
     browser::HoldBrowser,
     dialog,
-    enums::{CallbackTrigger, Event, Key},
-    group::Pack,
+    enums::{Align, CallbackTrigger, Color, Event, Font, FrameType, Key},
+    frame::Frame,
+    group::Flex,
     image::PngImage,
     input::Input,
     prelude::*,
@@ -26,12 +27,12 @@ use super::{
 
 const WINDOW_TITLE: &str = "Poor Man's Spotlight!";
 
-const WINDOW_WIDTH: i32 = 350;
-const WINDOW_HEIGHT: i32 = 500;
+const WINDOW_WIDTH: i32 = 400;
+const WINDOW_HEIGHT: i32 = 520;
 
 const WINDOW_ICON: &[u8] = include_bytes!("../../resources/window_icon/telescope.png");
 
-const BROWSER_TEXT_SIZE: i32 = 15; // default: 14
+const BROWSER_TEXT_SIZE: i32 = 13;
 
 pub struct PMSpotlightApp {
     controller: AppController,
@@ -42,33 +43,66 @@ pub struct PMSpotlightApp {
     // Row n maps to entries[n - 1], and browser rows borrow their icons from entries.
     // Clear the browser before entries so each icon outlives its row.
     entries: Vec<SearchResultEntry>,
-    _input: Input,
+    input: Input,
+    status: Frame,
+    shortcuts: Frame,
 }
 
 impl PMSpotlightApp {
     pub fn build(search_manager: SearchManager) -> Self {
-        let app = App::default();
+        let app = App::default().with_scheme(app::Scheme::Gtk);
+        app::background(255, 255, 255);
+        app::background2(255, 255, 255);
+        app::foreground(38, 51, 72);
+
         let mut window = Window::default()
             .with_size(WINDOW_WIDTH, WINDOW_HEIGHT)
             .with_label(WINDOW_TITLE);
-        let pack = Pack::default().size_of(&window);
+        let mut layout = Flex::default_fill().column();
+        layout.set_margin(8);
+        layout.set_pad(6);
 
         Self::set_window_icon(&mut window);
 
         let (sender, receiver) = app::channel();
 
-        let mut input = Input::default().with_size(0, 25);
-        let mut browser = HoldBrowser::default_fill();
+        let mut input = Input::default();
+        input.set_frame(FrameType::BorderBox);
+        input.set_color(Color::White);
+        input.set_text_font(Font::Helvetica);
+        input.set_text_size(16);
+        input.set_selection_color(Color::from_rgb(204, 223, 250));
+        layout.fixed(&input, 34);
 
+        let mut status = Frame::default().with_label("Files   ·   Type : to search emoji");
+        status.set_align(Align::Left | Align::Inside);
+        status.set_label_font(Font::Helvetica);
+        status.set_label_size(11);
+        status.set_label_color(Color::from_rgb(119, 130, 151));
+        layout.fixed(&status, 18);
+
+        let mut browser = HoldBrowser::default();
+        browser.set_frame(FrameType::FlatBox);
         browser.set_text_size(BROWSER_TEXT_SIZE);
+        browser.set_color(Color::White);
+        browser.set_selection_color(Color::from_rgb(238, 244, 255));
+        browser.set_scrollbar_size(8);
+
+        let mut shortcuts = Frame::default().with_label("↓ Navigate     Enter Open file");
+        shortcuts.set_align(Align::Left | Align::Inside);
+        shortcuts.set_label_font(Font::Helvetica);
+        shortcuts.set_label_size(11);
+        shortcuts.set_label_color(Color::from_rgb(119, 130, 151));
+        layout.fixed(&shortcuts, 20);
         input.set_trigger(CallbackTrigger::Changed);
 
         Self::callback_start_search(&mut input, sender);
         Self::fltk_event_list_execute_entry_and_focus_on_browser(&mut input, sender);
         Self::fltk_event_execute_entry_from_browser(&mut browser, sender);
 
-        pack.end();
-        window.make_resizable(true);
+        layout.end();
+        window.resizable(&layout);
+        window.size_range(320, 180, 0, 0);
         window.end();
         window.show();
 
@@ -79,7 +113,9 @@ impl PMSpotlightApp {
             receiver,
             browser,
             entries: Vec::new(),
-            _input: input,
+            input,
+            status,
+            shortcuts,
         }
     }
 
@@ -90,7 +126,7 @@ impl PMSpotlightApp {
 
     pub fn run(&mut self) {
         while self.app.wait() {
-            if let Some(event) = self.receiver.recv() {
+            while let Some(event) = self.receiver.recv() {
                 match event {
                     StartSearch(pattern) => {
                         self.message_event_start_search(pattern);
@@ -102,7 +138,10 @@ impl PMSpotlightApp {
                         self.message_event_focus_on_browser();
                     }
                     ExecuteEntry(alternate) => {
-                        self.message_event_execute_entry(alternate);
+                        if self.message_event_execute_entry(alternate) {
+                            self.app.quit();
+                            return;
+                        }
                     }
                 }
             }
@@ -166,17 +205,35 @@ impl PMSpotlightApp {
     fn message_event_start_search(&mut self, pattern: String) {
         self.browser.clear();
         self.entries.clear();
+        let emoji = pattern.starts_with(':');
+        self.status.set_label(if emoji { "Emoji" } else { "Files" });
+        self.shortcuts.set_label(if emoji {
+            "↓ Navigate     Enter Copy emoji"
+        } else {
+            "↓ Navigate     Enter Open file"
+        });
         self.controller.start_search(pattern, Arc::new(self.sender));
     }
 
     fn message_event_update_list(&mut self, entries: Vec<SearchResultEntry>) {
-        for entry in self.controller.filter_current_entries(entries) {
-            let icon = entry.icon.clone();
+        for mut entry in self.controller.filter_current_entries(entries) {
+            if let Some(image) = entry.icon.as_mut() {
+                image.scale(22, 22, true, true);
+            }
 
             self.browser.add(&entry.label);
-            self.browser.set_icon(self.browser.size(), icon);
+            self.browser
+                .set_icon(self.browser.size(), entry.icon.clone());
             self.entries.push(entry);
         }
+        let mode = if self.input.value().starts_with(':') {
+            "Emoji"
+        } else {
+            "Files"
+        };
+        let count = self.entries.iter().filter(|entry| entry.valid).count();
+        self.status
+            .set_label(&format!("{mode}   ·   {count} results"));
     }
 
     fn message_event_focus_on_browser(&mut self) {
@@ -186,24 +243,112 @@ impl PMSpotlightApp {
         }
     }
 
-    fn message_event_execute_entry(&mut self, alternate: bool) {
+    fn message_event_execute_entry(&mut self, alternate: bool) -> bool {
         let Some(selected_index) = selected_entry_index(self.browser.value(), self.browser.size())
         else {
-            return;
+            return false;
         };
 
         let Some(entry) = self.entries.get(selected_index).cloned() else {
-            return;
+            return false;
         };
 
         match self.controller.execute_entry(&entry, alternate) {
-            Ok(ExecutionAction::ExitApplication) => std::process::exit(0),
+            Ok(ExecutionAction::ExitApplication) => return true,
             Ok(ExecutionAction::Ignore) => {}
             Err(error) => {
                 dialog::alert_default(&format!(
                     "Poor Man's Spotlight could not execute the selected entry:\n\n{error}"
                 ));
+                set_focus(&self.input);
             }
         }
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{config::config_manager::Config, helpers::desktop_integration::DesktopIntegration};
+    use std::{
+        path::Path,
+        sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+        time::{Duration, Instant},
+    };
+
+    struct RecordingDesktop {
+        fail: AtomicBool,
+        calls: AtomicUsize,
+    }
+
+    impl DesktopIntegration for RecordingDesktop {
+        fn copy_text(&self, _text: String) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn open_path(&self, _path: &Path) -> Result<(), String> {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            if self.fail.load(Ordering::Relaxed) {
+                Err("desktop unavailable".into())
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an X display; run with xvfb-run and --ignored --test-threads=1"]
+    fn gui_keeps_failed_search_and_stops_draining_messages_after_success() {
+        let desktop = Arc::new(RecordingDesktop {
+            fail: AtomicBool::new(true),
+            calls: AtomicUsize::new(0),
+        });
+        let manager = SearchManager::with_dependencies(
+            Config {
+                search_paths: vec![],
+                skip_paths: vec![],
+            },
+            desktop.clone(),
+            std::env::temp_dir(),
+        )
+        .unwrap();
+        let mut application = PMSpotlightApp::build(manager);
+        application.input.set_value("foo/bar");
+        application.message_event_start_search("foo/bar".into());
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(UpdateList(entries)) = application.receiver.recv() {
+                assert!(entries.is_empty());
+                break;
+            }
+            assert!(Instant::now() < deadline, "timed out waiting for search");
+            app::wait_for(0.01).unwrap();
+        }
+        application.message_event_update_list(vec![
+            SearchResultEntry::new(None, "stale".into(), None, 0, true),
+            SearchResultEntry::new(None, "bar".into(), Some("/foo/bar".into()), 1, true),
+        ]);
+        assert_eq!(application.browser.size(), 1);
+
+        app::add_timeout3(0.01, |_| {
+            app::modal().expect("expected error dialog").hide();
+        });
+        assert!(!application.message_event_execute_entry(false));
+        assert_eq!(application.input.value(), "foo/bar");
+        assert_eq!(application.browser.size(), 1);
+        assert_eq!(application.entries[0].value.as_deref(), Some("/foo/bar"));
+
+        desktop.fail.store(false, Ordering::Relaxed);
+        application.sender.send(FocusOnBrowser);
+        application.sender.send(ExecuteEntry(false));
+        application.sender.send(ExecuteEntry(false));
+        application.run();
+        assert_eq!(desktop.calls.load(Ordering::Relaxed), 2);
+        assert!(matches!(
+            application.receiver.recv(),
+            Some(ExecuteEntry(false))
+        ));
+        assert!(!application.app.wait());
     }
 }
