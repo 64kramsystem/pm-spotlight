@@ -1,0 +1,5 @@
+[env]
+# Share ccache entries across target dirs and worktrees: hash paths relative to the build dir and
+# ignore the working directory.
+CCACHE_BASEDIR = "/"
+CCACHE_NOHASHDIR = "1"
