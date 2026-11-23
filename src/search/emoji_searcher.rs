@@ -1,4 +1,4 @@
-use fltk::image::PngImage;
+use fltk::image::{PngImage, SharedImage};
 use phf::phf_map;
 use std::sync::Arc;
 
@@ -172,7 +172,7 @@ fn matching_emojis(pattern: &str) -> Vec<(&'static str, &'static str, &'static [
 fn matching_emoji_entries(
     pattern: &str,
     search_id: u32,
-    mut load_icon: impl FnMut(&[u8]) -> Option<PngImage>,
+    mut load_icon: impl FnMut(&[u8]) -> Option<SharedImage>,
 ) -> Vec<SearchResultEntry> {
     matching_emojis(pattern)
         .into_iter()
@@ -208,7 +208,9 @@ impl Searcher for EmojiSearcher {
 
         if !pattern.is_empty() {
             let search_result = matching_emoji_entries(&pattern, search_id, |image_bytes| {
-                PngImage::from_data(image_bytes).ok()
+                PngImage::from_data(image_bytes)
+                    .ok()
+                    .and_then(|png| SharedImage::from_image(&png).ok())
             });
 
             sink.send(search_result);

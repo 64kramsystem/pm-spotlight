@@ -1,9 +1,8 @@
-use fltk::image::PngImage;
+use fltk::image::SharedImage;
 
 #[derive(Clone)]
 pub struct SearchResultEntry {
-    // Keep icons as PngImage; SharedImage crashes during browser redraws (fltk-rs#1701).
-    pub icon: Option<PngImage>,
+    pub icon: Option<SharedImage>,
     pub label: String,
     pub value: Option<String>,
     // This is wasteful, as entries are sent in batch; additionally, the App current search id is enough,
@@ -19,7 +18,7 @@ pub struct SearchResultEntry {
 
 impl SearchResultEntry {
     pub fn new(
-        icon: Option<PngImage>,
+        icon: Option<SharedImage>,
         label: String,
         value: Option<String>,
         search_id: u32,
